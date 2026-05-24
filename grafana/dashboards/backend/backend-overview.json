@@ -604,7 +604,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "up{job=\"backend\"}",
+          "expr": "min(up{job=\"backend\"})",
           "legendFormat": "scrape health",
           "refId": "A"
         }
@@ -662,7 +662,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "time() - genario_process_start_time_seconds{job=\"backend\"}",
+          "expr": "min(time() - genario_process_start_time_seconds{job=\"backend\"})",
           "legendFormat": "uptime",
           "refId": "A"
         }
@@ -692,4 +692,3 @@
   "version": 1,
   "weekStart": ""
 }
-

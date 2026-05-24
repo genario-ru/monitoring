@@ -87,7 +87,7 @@
       },
       "targets": [
         {
-          "expr": "up{job=\"postgres\"}",
+          "expr": "min(up{job=\"postgres\"})",
           "legendFormat": "scrape",
           "refId": "A"
         }
@@ -161,7 +161,7 @@
       },
       "targets": [
         {
-          "expr": "pg_up{job=\"postgres\"}",
+          "expr": "min(pg_up{job=\"postgres\"})",
           "legendFormat": "pg_up",
           "refId": "A"
         }
