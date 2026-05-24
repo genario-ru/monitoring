@@ -9,19 +9,19 @@ groups:
           summary: Backend target is down
           description: The backend scrape target has been unreachable for more than 2 minutes.
 
-      - alert: AppNodeDown
-        expr: up{job="app-node"} == 0
+      - alert: BackendNodeDown
+        expr: up{job="backend-node"} == 0
         for: 2m
         annotations:
-          summary: App VPS host metrics are down
-          description: The node_exporter target on the app VPS has been unreachable for more than 2 minutes.
+          summary: Backend VPS host metrics are down
+          description: The node_exporter target on the backend VPS has been unreachable for more than 2 minutes.
 
-      - alert: DataNodeDown
-        expr: up{job="data-node"} == 0
+      - alert: DbNodeDown
+        expr: up{job="db-node"} == 0
         for: 2m
         annotations:
-          summary: Data VPS host metrics are down
-          description: The node_exporter target on the data VPS has been unreachable for more than 2 minutes.
+          summary: DB VPS host metrics are down
+          description: The node_exporter target on the db VPS has been unreachable for more than 2 minutes.
 
       - alert: PostgresDown
         expr: up{job="postgres"} == 0
@@ -58,21 +58,21 @@ groups:
     interval: 30s
     rules:
       - alert: HostHighCpu
-        expr: 100 - (avg by (instance, job) (rate(node_cpu_seconds_total{mode="idle",job=~"app-node|data-node"}[5m])) * 100) > 85
+        expr: 100 - (avg by (instance, job) (rate(node_cpu_seconds_total{mode="idle",job=~"backend-node|db-node"}[5m])) * 100) > 85
         for: 15m
         annotations:
           summary: Host CPU usage is high
           description: Host CPU usage has been above 85% for 15 minutes.
 
       - alert: HostLowMemory
-        expr: (1 - (node_memory_MemAvailable_bytes{job=~"app-node|data-node"} / node_memory_MemTotal_bytes{job=~"app-node|data-node"})) > 0.9
+        expr: (1 - (node_memory_MemAvailable_bytes{job=~"backend-node|db-node"} / node_memory_MemTotal_bytes{job=~"backend-node|db-node"})) > 0.9
         for: 15m
         annotations:
           summary: Host memory pressure is high
           description: Available memory has been below 10% for 15 minutes.
 
       - alert: HostDiskAlmostFull
-        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"app-node|data-node"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"app-node|data-node"})) > 0.9
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"backend-node|db-node"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"backend-node|db-node"})) > 0.9
         for: 15m
         annotations:
           summary: Root filesystem is almost full
@@ -97,4 +97,3 @@ groups:
         annotations:
           summary: Redis memory usage is high
           description: Redis memory usage has been above 90% of maxmemory for 10 minutes.
-

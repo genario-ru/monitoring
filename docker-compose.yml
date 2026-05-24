@@ -22,8 +22,8 @@ services:
     image: ${VICTORIAMETRICS_IMAGE}
     restart: unless-stopped
     environment:
-      APP_DOMAIN: ${APP_DOMAIN}
-      DATA_VPS_IP: ${DATA_VPS_IP}
+      BACKEND_VPS_DOMAIN: ${BACKEND_VPS_DOMAIN}
+      DB_VPS_IP: ${DB_VPS_IP}
       POSTGRES_EXPORTER_PORT: ${POSTGRES_EXPORTER_PORT}
       REDIS_EXPORTER_PORT: ${REDIS_EXPORTER_PORT}
     command:

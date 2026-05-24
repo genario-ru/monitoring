@@ -12,6 +12,7 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 - `docker-compose.yml`: monitoring stack definition
 - `.env.example`: required runtime variables
+- `scripts/`: bootstrap scripts for `backend VPS` and `db VPS`
 - `victoriametrics/`: scrape configuration for `VictoriaMetrics`
 - `vmalert/`: alert rules for `vmalert`
 - `alertmanager/`: Alertmanager config
@@ -20,11 +21,11 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 ## What this repository currently covers
 
-- `backend` scrape target on `http://<app-vps-ip>:3000/metrics`
-- `app-node` scrape target on `http://<app-vps-ip>:9100/metrics`
-- `data-node` scrape target on `http://<data-vps-ip>:9100/metrics`
-- `postgres` scrape target on `http://<data-vps-ip>:<postgres-exporter-port>/metrics`
-- `redis` scrape target on `http://<data-vps-ip>:<redis-exporter-port>/metrics`
+- `backend` scrape target on `http://<backend-vps-ip>:3000/metrics`
+- `backend-node` scrape target on `http://<backend-vps-ip>:9100/metrics`
+- `db-node` scrape target on `http://<db-vps-ip>:9100/metrics`
+- `postgres` scrape target on `http://<db-vps-ip>:<postgres-exporter-port>/metrics`
+- `redis` scrape target on `http://<db-vps-ip>:<redis-exporter-port>/metrics`
 - one host dashboard
 - one backend dashboard
 - one PostgreSQL dashboard
@@ -43,8 +44,8 @@ This repository still does **not** include:
 2. Set:
    - `GRAFANA_ADMIN_USER`
    - `GRAFANA_ADMIN_PASSWORD`
-   - `APP_DOMAIN`
-   - `DATA_VPS_IP`
+   - `BACKEND_VPS_DOMAIN`
+   - `DB_VPS_IP`
    - `POSTGRES_EXPORTER_PORT`
    - `REDIS_EXPORTER_PORT`
    - `ALERTMANAGER_TELEGRAM_BOT_TOKEN`
@@ -74,7 +75,33 @@ After startup:
 - confirm the `VictoriaMetrics` datasource is healthy
 - confirm the `Host Overview`, `Backend Overview`, `Postgres Overview`, and `Redis Overview` dashboards are present
 
-## Manual work on app VPS
+## Bootstrap scripts
+
+You can bootstrap new servers with repo scripts instead of repeating the
+manual install steps.
+
+Backend VPS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-backend-vps.sh -o bootstrap-backend-vps.sh
+sudo MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-backend-vps.sh
+```
+
+DB VPS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-db-vps.sh -o bootstrap-db-vps.sh
+sudo \
+  MONITORING_VPS_IP=<monitoring-vps-ip> \
+  POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> \
+  REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> \
+  bash bootstrap-db-vps.sh
+```
+
+The scripts install exporters, create system users, write `systemd` units,
+start services, and optionally add `ufw` rules if `MONITORING_VPS_IP` is set.
+
+## Manual work on backend VPS
 
 1. Install `node_exporter` as a `systemd` service.
 2. Open port `9100` **only** for the monitoring VPS IP.
@@ -86,8 +113,8 @@ METRICS_ALLOWED_IPS=<monitoring-vps-ip>
 
 4. Redeploy `genario-backend` after the `/metrics` code changes.
 5. Verify that:
-   - `curl http://127.0.0.1:3000/metrics` works from the app host only if the source IP is allowlisted
-   - VictoriaMetrics shows `backend` and `app-node` as `UP`
+   - `curl http://127.0.0.1:3000/metrics` works from the backend host only if the source IP is allowlisted
+   - VictoriaMetrics shows `backend` and `backend-node` as `UP`
 
 Example `node_exporter` service:
 
@@ -107,7 +134,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-## Manual work on data VPS
+## Manual work on db VPS
 
 1. Install `node_exporter` as a `systemd` service.
 2. Open port `9100` **only** for the monitoring VPS IP.
@@ -121,7 +148,7 @@ GRANT pg_monitor TO postgres_exporter;
 4. Install `postgres_exporter` as a `systemd` service.
 5. Install `redis_exporter` as a `systemd` service.
 6. Open ports `9187` and `9121` **only** for the monitoring VPS IP.
-7. Verify that VictoriaMetrics shows `data-node`, `postgres`, and `redis` as `UP`.
+7. Verify that VictoriaMetrics shows `db-node`, `postgres`, and `redis` as `UP`.
 
 Example `postgres_exporter` DSN:
 
@@ -180,11 +207,11 @@ WantedBy=multi-user.target
 
 ## Firewall checklist
 
-- allow `monitoring VPS -> app VPS : 3000`
-- allow `monitoring VPS -> app VPS : 9100`
-- allow `monitoring VPS -> data VPS : 9100`
-- allow `monitoring VPS -> data VPS : 9187`
-- allow `monitoring VPS -> data VPS : 9121`
+- allow `monitoring VPS -> backend VPS : 3000`
+- allow `monitoring VPS -> backend VPS : 9100`
+- allow `monitoring VPS -> db VPS : 9100`
+- allow `monitoring VPS -> db VPS : 9187`
+- allow `monitoring VPS -> db VPS : 9121`
 - do **not** publish VictoriaMetrics, `vmalert`, or Alertmanager to the public internet
 - do **not** publish custom `80/443` ports from this compose stack; Dokploy already owns ingress on the server
 
@@ -199,7 +226,7 @@ WantedBy=multi-user.target
 
 - `https://grafana.<domain>` is reachable over `HTTPS`
 - Grafana requires login
-- `backend`, `app-node`, `data-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
+- `backend`, `backend-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
 - `Host Overview` shows CPU, memory, disk, load, network, uptime
 - `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime
 - `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure
