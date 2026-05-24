@@ -101,7 +101,15 @@ services:
       POSTGRES_USER: ${GLITCHTIP_POSTGRES_USER}
       POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD}
     volumes:
-      - glitchtip_pg_data:/var/lib/postgresql/data
+      - glitchtip_pg_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - monitoring
 
@@ -112,6 +120,16 @@ services:
       - valkey-server
       - --requirepass
       - ${GLITCHTIP_VALKEY_PASSWORD}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - valkey-cli -a "$$GLITCHTIP_VALKEY_PASSWORD" ping | grep PONG
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    environment:
+      GLITCHTIP_VALKEY_PASSWORD: ${GLITCHTIP_VALKEY_PASSWORD}
     networks:
       - monitoring
 
@@ -119,8 +137,10 @@ services:
     image: ${GLITCHTIP_IMAGE}
     restart: unless-stopped
     depends_on:
-      - glitchtip-postgres
-      - glitchtip-valkey
+      glitchtip-postgres:
+        condition: service_healthy
+      glitchtip-valkey:
+        condition: service_healthy
     environment:
       <<: *glitchtip-environment
       SERVER_ROLE: all_in_one
