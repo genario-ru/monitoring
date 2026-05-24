@@ -93,7 +93,7 @@ Example `node_exporter` service:
 
 ```ini
 [Unit]
-Description=Prometheus Node Exporter
+Description=Node Exporter
 After=network-online.target
 Wants=network-online.target
 
@@ -133,7 +133,7 @@ Example `postgres_exporter` service:
 
 ```ini
 [Unit]
-Description=Prometheus PostgreSQL Exporter
+Description=PostgreSQL Exporter
 After=network-online.target
 Wants=network-online.target
 
@@ -164,7 +164,7 @@ Example `redis_exporter` service:
 
 ```ini
 [Unit]
-Description=Prometheus Redis Exporter
+Description=Redis Exporter
 After=network-online.target
 Wants=network-online.target
 

@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -65,7 +65,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "victoriametrics"
           },
           "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{job=~\"app-node|data-node\",mode=\"idle\"}[5m])) * 100)",
           "legendFormat": "{{instance}}",
@@ -78,7 +78,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -119,7 +119,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "victoriametrics"
           },
           "expr": "100 * (1 - (node_memory_MemAvailable_bytes{job=~\"app-node|data-node\"} / node_memory_MemTotal_bytes{job=~\"app-node|data-node\"}))",
           "legendFormat": "{{instance}}",
@@ -132,7 +132,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -173,7 +173,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "victoriametrics"
           },
           "expr": "100 * (1 - (node_filesystem_avail_bytes{job=~\"app-node|data-node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=~\"app-node|data-node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}))",
           "legendFormat": "{{instance}}",
@@ -186,7 +186,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -226,7 +226,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "victoriametrics"
           },
           "expr": "node_load1{job=~\"app-node|data-node\"}",
           "legendFormat": "{{instance}}",
@@ -239,7 +239,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -279,7 +279,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "victoriametrics"
           },
           "expr": "sum by (instance) (rate(node_network_receive_bytes_total{job=~\"app-node|data-node\",device!~\"lo|veth.*|docker.*\"}[5m]))",
           "legendFormat": "{{instance}}",
@@ -292,7 +292,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -337,7 +337,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "victoriametrics"
           },
           "expr": "time() - node_boot_time_seconds{job=~\"app-node|data-node\"}",
           "legendFormat": "{{instance}}",
@@ -369,4 +369,5 @@
   "version": 1,
   "weekStart": ""
 }
+
 
