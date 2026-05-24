@@ -20,6 +20,14 @@ POSTGRES_EXPORTER_DB_USER="${POSTGRES_EXPORTER_DB_USER:-postgres_exporter}"
 POSTGRES_EXPORTER_DB_PASSWORD="${POSTGRES_EXPORTER_DB_PASSWORD:-}"
 POSTGRES_SSLMODE="${POSTGRES_SSLMODE:-disable}"
 
+POSTGRES_ADMIN_SYSTEM_USER="${POSTGRES_ADMIN_SYSTEM_USER:-postgres}"
+POSTGRES_ADMIN_DB_HOST="${POSTGRES_ADMIN_DB_HOST:-127.0.0.1}"
+POSTGRES_ADMIN_DB_PORT="${POSTGRES_ADMIN_DB_PORT:-5432}"
+POSTGRES_ADMIN_DB_NAME="${POSTGRES_ADMIN_DB_NAME:-postgres}"
+POSTGRES_ADMIN_DB_USER="${POSTGRES_ADMIN_DB_USER:-postgres}"
+POSTGRES_ADMIN_DB_PASSWORD="${POSTGRES_ADMIN_DB_PASSWORD:-}"
+POSTGRES_SKIP_ROLE_SETUP="${POSTGRES_SKIP_ROLE_SETUP:-false}"
+
 REDIS_EXPORTER_REDIS_ADDR="${REDIS_EXPORTER_REDIS_ADDR:-redis://127.0.0.1:6379}"
 REDIS_EXPORTER_REDIS_PASSWORD="${REDIS_EXPORTER_REDIS_PASSWORD:-}"
 
@@ -37,6 +45,27 @@ require_postgres_password() {
     echo "POSTGRES_EXPORTER_DB_PASSWORD is required." >&2
     exit 1
   fi
+}
+
+run_psql_as_admin() {
+  local sql="$1"
+
+  if id "${POSTGRES_ADMIN_SYSTEM_USER}" >/dev/null 2>&1; then
+    sudo -u "${POSTGRES_ADMIN_SYSTEM_USER}" psql -d "${POSTGRES_ADMIN_DB_NAME}" -v ON_ERROR_STOP=1 <<EOF
+${sql}
+EOF
+    return
+  fi
+
+  PGPASSWORD="${POSTGRES_ADMIN_DB_PASSWORD}" \
+    psql \
+      -h "${POSTGRES_ADMIN_DB_HOST}" \
+      -p "${POSTGRES_ADMIN_DB_PORT}" \
+      -U "${POSTGRES_ADMIN_DB_USER}" \
+      -d "${POSTGRES_ADMIN_DB_NAME}" \
+      -v ON_ERROR_STOP=1 <<EOF
+${sql}
+EOF
 }
 
 install_packages() {
@@ -98,10 +127,16 @@ install_redis_exporter() {
 }
 
 create_postgres_monitoring_user() {
+  if [[ "${POSTGRES_SKIP_ROLE_SETUP}" == "true" ]]; then
+    echo "Skipping PostgreSQL role setup because POSTGRES_SKIP_ROLE_SETUP=true."
+    return
+  fi
+
   local escaped_password
   escaped_password="${POSTGRES_EXPORTER_DB_PASSWORD//\'/\'\'}"
+  local role_sql
 
-  sudo -u postgres psql <<EOF
+  role_sql="$(cat <<EOF
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${POSTGRES_EXPORTER_DB_USER}') THEN
@@ -113,6 +148,9 @@ END
 \$\$;
 GRANT pg_monitor TO ${POSTGRES_EXPORTER_DB_USER};
 EOF
+)"
+
+  run_psql_as_admin "${role_sql}"
 }
 
 write_node_exporter_service() {
@@ -218,6 +256,13 @@ Verify from monitoring VPS:
 - curl http://<db-host>:${NODE_EXPORTER_PORT}/metrics
 - curl http://<db-host>:${POSTGRES_EXPORTER_PORT}/metrics
 - curl http://<db-host>:${REDIS_EXPORTER_PORT}/metrics
+
+Notes:
+- If the server has no local Unix user named "${POSTGRES_ADMIN_SYSTEM_USER}", provide PostgreSQL admin credentials:
+  POSTGRES_ADMIN_DB_USER=<admin-user>
+  POSTGRES_ADMIN_DB_PASSWORD=<admin-password>
+- If the exporter role already exists and you do not want the script to manage it, set:
+  POSTGRES_SKIP_ROLE_SETUP=true
 EOF
 }
 

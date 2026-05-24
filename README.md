@@ -94,12 +94,16 @@ curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts
 sudo \
   MONITORING_VPS_IP=<monitoring-vps-ip> \
   POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> \
+  POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> \
+  POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> \
   REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> \
   bash bootstrap-db-vps.sh
 ```
 
 The scripts install exporters, create system users, write `systemd` units,
 start services, and optionally add `ufw` rules if `MONITORING_VPS_IP` is set.
+If the server does not have a local Unix user named `postgres`, the DB bootstrap
+script can connect through regular PostgreSQL admin credentials instead.
 
 ## Manual work on backend VPS
 
