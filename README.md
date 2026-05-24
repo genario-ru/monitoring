@@ -6,7 +6,7 @@ This repository contains the self-hosted monitoring stack for `genario`:
 - `Grafana` renders dashboards
 - `VictoriaMetrics` stores, scrapes, and serves metrics
 - `vmalert` evaluates alert rules against `VictoriaMetrics`
-- `Alertmanager` routes baseline alerts to `Telegram` and `email`
+- `Alertmanager` routes baseline alerts to `email`
 
 ## Repository layout
 
@@ -48,8 +48,6 @@ This repository still does **not** include:
    - `DB_VPS_IP`
    - `POSTGRES_EXPORTER_PORT`
    - `REDIS_EXPORTER_PORT`
-   - `ALERTMANAGER_TELEGRAM_BOT_TOKEN`
-   - `ALERTMANAGER_TELEGRAM_CHAT_ID`
    - `ALERTMANAGER_EMAIL_FROM`
    - `ALERTMANAGER_EMAIL_TO`
    - `ALERTMANAGER_EMAIL_SMARTHOST`
@@ -215,13 +213,11 @@ WantedBy=multi-user.target
 
 ## Alerts
 
-- All baseline alerts go to both `Telegram` and `email`.
+- All baseline alerts go to `email`.
 - Routing is intentionally simple in this phase: no severity splitting yet.
 - Baseline thresholds in alert rules are starting defaults only.
 - Revisit thresholds after several days of production observation.
 - Required env for alerting:
-  - `ALERTMANAGER_TELEGRAM_BOT_TOKEN`
-  - `ALERTMANAGER_TELEGRAM_CHAT_ID`
   - `ALERTMANAGER_EMAIL_FROM`
   - `ALERTMANAGER_EMAIL_TO`
   - `ALERTMANAGER_EMAIL_SMARTHOST`
@@ -245,7 +241,7 @@ End-to-end smoke test:
 2. Wait for the `RedisDown` alert to fire.
 3. Confirm the alert appears in `vmalert`.
 4. Confirm the alert appears in `Alertmanager`.
-5. Confirm the notification arrives in both `Telegram` and `email`.
+5. Confirm the notification arrives in `email`.
 6. Start `redis_exporter` again and verify resolved notification delivery.
 
 Repeat the same flow with `postgres_exporter` and `PostgresDown`.
@@ -260,4 +256,4 @@ Repeat the same flow with `postgres_exporter` and `PostgresDown`.
 - `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure
 - `Redis Overview` shows exporter health, Redis health, memory usage, clients, ops/sec, evictions, rejected connections, persistence health
 - `/metrics` on the backend is only accessible from the allowlisted monitoring IP
-- stopping `postgres_exporter` or `redis_exporter` produces a test alert delivered to both `Telegram` and `email`
+- stopping `postgres_exporter` or `redis_exporter` produces a test alert delivered to `email`

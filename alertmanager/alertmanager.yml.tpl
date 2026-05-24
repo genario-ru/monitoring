@@ -15,17 +15,6 @@ route:
 
 receivers:
   - name: "default-notifications"
-    telegram_configs:
-      - bot_token: "__ALERTMANAGER_TELEGRAM_BOT_TOKEN__"
-        chat_id: __ALERTMANAGER_TELEGRAM_CHAT_ID__
-        parse_mode: "HTML"
-        send_resolved: true
-        message: |
-          <b>{{ .Status | toUpper }}</b>
-          <b>{{ .CommonLabels.alertname }}</b>
-          {{ range .Alerts }}{{ .Annotations.summary }}{{ if .Annotations.description }}
-          {{ .Annotations.description }}{{ end }}
-          {{ end }}
     email_configs:
       - to: "__ALERTMANAGER_EMAIL_TO__"
         send_resolved: true

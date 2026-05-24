@@ -59,15 +59,12 @@ services:
       - -c
     command:
       - |
-        telegram_bot_token_escaped=$$(printf '%s' "${ALERTMANAGER_TELEGRAM_BOT_TOKEN}" | sed -e 's/[&|]/\\&/g')
         email_from_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_FROM}" | sed -e 's/[&|]/\\&/g')
         email_to_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_TO}" | sed -e 's/[&|]/\\&/g')
         email_smarthost_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_SMARTHOST}" | sed -e 's/[&|]/\\&/g')
         email_auth_username_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_AUTH_USERNAME}" | sed -e 's/[&|]/\\&/g')
         email_auth_password_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_AUTH_PASSWORD}" | sed -e 's/[&|]/\\&/g')
         sed \
-          -e "s|__ALERTMANAGER_TELEGRAM_BOT_TOKEN__|$$telegram_bot_token_escaped|g" \
-          -e "s|__ALERTMANAGER_TELEGRAM_CHAT_ID__|${ALERTMANAGER_TELEGRAM_CHAT_ID}|g" \
           -e "s|__ALERTMANAGER_EMAIL_FROM__|$$email_from_escaped|g" \
           -e "s|__ALERTMANAGER_EMAIL_TO__|$$email_to_escaped|g" \
           -e "s|__ALERTMANAGER_EMAIL_SMARTHOST__|$$email_smarthost_escaped|g" \
