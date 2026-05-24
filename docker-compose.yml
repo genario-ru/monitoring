@@ -1,0 +1,109 @@
+services:
+  caddy:
+    image: ${CADDY_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      - grafana
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      GRAFANA_DOMAIN: ${GRAFANA_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - monitoring
+
+  grafana:
+    image: ${GRAFANA_IMAGE}
+    restart: unless-stopped
+    environment:
+      GF_SERVER_DOMAIN: ${GRAFANA_DOMAIN}
+      GF_SERVER_ROOT_URL: https://${GRAFANA_DOMAIN}
+      GF_SERVER_ENFORCE_DOMAIN: "true"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - monitoring
+
+  victoriametrics:
+    image: ${VICTORIAMETRICS_IMAGE}
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/victoria-metrics-data
+      - -retentionPeriod=${VICTORIAMETRICS_RETENTION_MONTHS}
+      - -promscrape.config=/etc/victoriametrics/scrape.yml
+      - -selfScrapeInterval=30s
+    volumes:
+      - victoriametrics_data:/victoria-metrics-data
+      - ./victoriametrics/scrape.yml:/etc/victoriametrics/scrape.yml:ro
+    networks:
+      - monitoring
+
+  vmalert:
+    image: ${VMALERT_IMAGE}
+    restart: unless-stopped
+    command:
+      - -rule=/etc/vmalert/rules/*.yml
+      - -datasource.url=http://victoriametrics:8428
+      - -notifier.url=http://alertmanager:9093
+      - -httpListenAddr=:8880
+      - -datasource.queryStep=30s
+    volumes:
+      - ./vmalert/rules:/etc/vmalert/rules:ro
+    networks:
+      - monitoring
+
+  alertmanager:
+    image: ${ALERTMANAGER_IMAGE}
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - |
+        telegram_bot_token_escaped=$$(printf '%s' "${ALERTMANAGER_TELEGRAM_BOT_TOKEN}" | sed -e 's/[&|]/\\&/g')
+        email_from_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_FROM}" | sed -e 's/[&|]/\\&/g')
+        email_to_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_TO}" | sed -e 's/[&|]/\\&/g')
+        email_smarthost_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_SMARTHOST}" | sed -e 's/[&|]/\\&/g')
+        email_auth_username_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_AUTH_USERNAME}" | sed -e 's/[&|]/\\&/g')
+        email_auth_password_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_AUTH_PASSWORD}" | sed -e 's/[&|]/\\&/g')
+        sed \
+          -e "s|__ALERTMANAGER_TELEGRAM_BOT_TOKEN__|$$telegram_bot_token_escaped|g" \
+          -e "s|__ALERTMANAGER_TELEGRAM_CHAT_ID__|${ALERTMANAGER_TELEGRAM_CHAT_ID}|g" \
+          -e "s|__ALERTMANAGER_EMAIL_FROM__|$$email_from_escaped|g" \
+          -e "s|__ALERTMANAGER_EMAIL_TO__|$$email_to_escaped|g" \
+          -e "s|__ALERTMANAGER_EMAIL_SMARTHOST__|$$email_smarthost_escaped|g" \
+          -e "s|__ALERTMANAGER_EMAIL_AUTH_USERNAME__|$$email_auth_username_escaped|g" \
+          -e "s|__ALERTMANAGER_EMAIL_AUTH_PASSWORD__|$$email_auth_password_escaped|g" \
+          -e "s|__ALERTMANAGER_EMAIL_REQUIRE_TLS__|${ALERTMANAGER_EMAIL_REQUIRE_TLS}|g" \
+          /etc/alertmanager/alertmanager.yml.tpl > /tmp/alertmanager.yml
+        exec /bin/alertmanager \
+          --config.file=/tmp/alertmanager.yml \
+          --storage.path=/alertmanager
+    volumes:
+      - alertmanager_data:/alertmanager
+      - ./alertmanager/alertmanager.yml.tpl:/etc/alertmanager/alertmanager.yml.tpl:ro
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  grafana_data:
+  victoriametrics_data:
+  alertmanager_data:
