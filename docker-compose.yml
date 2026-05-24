@@ -1,3 +1,15 @@
+x-glitchtip-environment: &glitchtip-environment
+  DATABASE_URL: postgres://${GLITCHTIP_POSTGRES_USER}:${GLITCHTIP_POSTGRES_PASSWORD}@glitchtip-postgres:5432/${GLITCHTIP_POSTGRES_DB}
+  VALKEY_URL: redis://:${GLITCHTIP_VALKEY_PASSWORD}@glitchtip-valkey:6379/0
+  SECRET_KEY: ${GLITCHTIP_SECRET_KEY}
+  EMAIL_URL: ${GLITCHTIP_EMAIL_URL}
+  GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN}
+  DEFAULT_FROM_EMAIL: ${GLITCHTIP_DEFAULT_FROM_EMAIL}
+  ENABLE_ADMIN: "${GLITCHTIP_ENABLE_ADMIN}"
+  ENABLE_OPENAPI: "${GLITCHTIP_ENABLE_OPENAPI}"
+  GLITCHTIP_ENABLE_MCP: "${GLITCHTIP_ENABLE_MCP}"
+  GLITCHTIP_ENABLE_DUCKDB: "${GLITCHTIP_ENABLE_DUCKDB}"
+
 services:
   grafana:
     image: ${GRAFANA_IMAGE}
@@ -81,6 +93,44 @@ services:
     networks:
       - monitoring
 
+  glitchtip-postgres:
+    image: ${GLITCHTIP_POSTGRES_IMAGE}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${GLITCHTIP_POSTGRES_DB}
+      POSTGRES_USER: ${GLITCHTIP_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${GLITCHTIP_POSTGRES_PASSWORD}
+    volumes:
+      - glitchtip_pg_data:/var/lib/postgresql/data
+    networks:
+      - monitoring
+
+  glitchtip-valkey:
+    image: ${GLITCHTIP_VALKEY_IMAGE}
+    restart: unless-stopped
+    command:
+      - valkey-server
+      - --requirepass
+      - ${GLITCHTIP_VALKEY_PASSWORD}
+    networks:
+      - monitoring
+
+  glitchtip:
+    image: ${GLITCHTIP_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      - glitchtip-postgres
+      - glitchtip-valkey
+    environment:
+      <<: *glitchtip-environment
+      SERVER_ROLE: all_in_one
+    expose:
+      - "8000"
+    volumes:
+      - glitchtip_uploads:/code/uploads
+    networks:
+      - monitoring
+
 networks:
   monitoring:
     driver: bridge
@@ -89,3 +139,5 @@ volumes:
   grafana_data:
   victoriametrics_data:
   alertmanager_data:
+  glitchtip_pg_data:
+  glitchtip_uploads:

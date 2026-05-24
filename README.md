@@ -2,11 +2,12 @@
 
 This repository contains the self-hosted monitoring stack for `genario`:
 
-- `Dokploy Domains` publishes Grafana on `https://grafana.<your-domain>`
+- `Dokploy Domains` publishes Grafana on `https://grafana.<your-domain>` and GlitchTip on `https://glitchtip.<your-domain>`
 - `Grafana` renders dashboards
 - `VictoriaMetrics` stores, scrapes, and serves metrics
 - `vmalert` evaluates alert rules against `VictoriaMetrics`
 - `Alertmanager` routes baseline alerts to `email`
+- `GlitchTip` provides self-hosted error tracking with its own PostgreSQL and Valkey dependencies
 
 ## Repository layout
 
@@ -31,12 +32,14 @@ This repository contains the self-hosted monitoring stack for `genario`:
 - one PostgreSQL dashboard
 - one Redis dashboard
 - baseline alert rules for backend, hosts, PostgreSQL, and Redis
+- one self-hosted `GlitchTip` deployment for application error tracking
 
 This repository still does **not** include:
 
 - worker metrics
 - logs / traces
 - HA `VictoriaMetrics` / `vmalert` / `Alertmanager`
+- application-side GlitchTip SDK wiring for each service
 
 ## Local configuration
 
@@ -54,8 +57,16 @@ This repository still does **not** include:
    - `ALERTMANAGER_EMAIL_AUTH_USERNAME`
    - `ALERTMANAGER_EMAIL_AUTH_PASSWORD`
    - `ALERTMANAGER_EMAIL_REQUIRE_TLS`
+   - `GLITCHTIP_DOMAIN`
+   - `GLITCHTIP_SECRET_KEY`
+   - `GLITCHTIP_DEFAULT_FROM_EMAIL`
+   - `GLITCHTIP_EMAIL_URL`
+   - `GLITCHTIP_POSTGRES_PASSWORD`
+   - `GLITCHTIP_VALKEY_PASSWORD`
 3. Keep `VICTORIAMETRICS_RETENTION_MONTHS=1` unless you have a clear reason to retain more metrics.
-5. Keep all Alertmanager secrets only in the real `.env` on the monitoring VPS; never commit them to git.
+4. Keep `GLITCHTIP_ENABLE_ADMIN=false`, `GLITCHTIP_ENABLE_OPENAPI=false`, and `GLITCHTIP_ENABLE_MCP=false` unless you explicitly need them.
+5. `GLITCHTIP_EMAIL_URL=consolemail://` is acceptable for first boot and testing. For production, replace it with a real SMTP URL so invites, password resets, and notifications leave the container.
+6. Keep all Alertmanager and GlitchTip secrets only in the real `.env` on the monitoring VPS; never commit them to git.
 
 ## Deploy on monitoring VPS
 
@@ -68,10 +79,21 @@ docker compose up -d
 After startup:
 
 - configure a Dokploy domain for the `grafana` service on port `3000`
+- configure a Dokploy domain for the `glitchtip` service on port `8000`
 - open the configured Grafana domain
 - log in with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`
 - confirm the `VictoriaMetrics` datasource is healthy
 - confirm the `Host Overview`, `Backend Overview`, `Postgres Overview`, and `Redis Overview` dashboards are present
+- open the configured GlitchTip domain
+- create the first GlitchTip user and organization
+- if `GLITCHTIP_EMAIL_URL=consolemail://`, use `docker compose logs -f glitchtip` to inspect outbound email output until SMTP is configured
+
+## GlitchTip notes
+
+- The compose stack follows the current GlitchTip Docker installation guidance as of May 25, 2026: one `all_in_one` GlitchTip container plus dedicated PostgreSQL and Valkey containers.
+- Database migrations run automatically on `glitchtip` startup; there is no separate `migrate` service in this repository.
+- Uploaded artifacts such as sourcemaps are stored in the `glitchtip_uploads` Docker volume.
+- The PostgreSQL and Valkey containers are internal-only and stay on the `monitoring` Docker network.
 
 ## Bootstrap scripts
 
@@ -249,7 +271,9 @@ Repeat the same flow with `postgres_exporter` and `PostgresDown`.
 ## Acceptance checklist
 
 - `https://grafana.<domain>` is reachable over `HTTPS`
+- `https://glitchtip.<domain>` is reachable over `HTTPS`
 - Grafana requires login
+- GlitchTip shows the setup/login screen and can create the first organization
 - `backend`, `backend-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
 - `Host Overview` shows CPU, memory, disk, load, network, uptime
 - `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime
