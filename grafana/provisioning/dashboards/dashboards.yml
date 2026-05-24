@@ -1,11 +1,19 @@
 apiVersion: 1
 
 providers:
-  - name: monitoring-dashboards
+  - name: backend
     orgId: 1
-    folder: Monitoring
+    folder: Backend
     type: file
     disableDeletion: false
     editable: true
     options:
-      path: /etc/grafana/dashboards
+      path: /etc/grafana/dashboards/backend
+  - name: db
+    orgId: 1
+    folder: DB
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards/db
