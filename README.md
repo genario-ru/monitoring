@@ -84,20 +84,14 @@ Backend VPS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-backend-vps.sh -o bootstrap-backend-vps.sh
-sudo MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-backend-vps.sh
+sudo env MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-backend-vps.sh
 ```
 
 DB VPS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-db-vps.sh -o bootstrap-db-vps.sh
-sudo \
-  MONITORING_VPS_IP=<monitoring-vps-ip> \
-  POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> \
-  POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> \
-  POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> \
-  REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> \
-  bash bootstrap-db-vps.sh
+sudo env MONITORING_VPS_IP=<monitoring-vps-ip> POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> bash bootstrap-db-vps.sh
 ```
 
 The scripts install exporters, create system users, write `systemd` units,
