@@ -39,4 +39,3 @@ scrape_configs:
     static_configs:
       - targets:
           - "%{DATA_VPS_IP}:%{REDIS_EXPORTER_PORT}"
-

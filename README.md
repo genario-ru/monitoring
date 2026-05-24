@@ -12,7 +12,7 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 - `docker-compose.yml`: monitoring stack definition
 - `.env.example`: required runtime variables
-- `victoriametrics/`: scrape configuration for `VictoriaMetrics`
+- `victoriametrics/`: scrape configuration template for `VictoriaMetrics`
 - `vmalert/`: alert rules for `vmalert`
 - `alertmanager/`: Alertmanager config
 - `grafana/provisioning/`: automatic datasource and dashboard provisioning
@@ -56,6 +56,7 @@ This repository still does **not** include:
    - `ALERTMANAGER_EMAIL_AUTH_PASSWORD`
    - `ALERTMANAGER_EMAIL_REQUIRE_TLS`
 3. Keep `VICTORIAMETRICS_RETENTION_MONTHS=1` unless you have a clear reason to retain more metrics.
+4. `docker compose` renders the final `VictoriaMetrics` scrape config from `victoriametrics/scrape.yml.tpl` using the IPs and ports from `.env`.
 5. Keep all Alertmanager secrets only in the real `.env` on the monitoring VPS; never commit them to git.
 
 ## Deploy on monitoring VPS
