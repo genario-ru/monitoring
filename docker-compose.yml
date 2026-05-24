@@ -54,9 +54,10 @@ services:
   alertmanager:
     image: ${ALERTMANAGER_IMAGE}
     restart: unless-stopped
-    command:
+    entrypoint:
       - /bin/sh
       - -c
+    command:
       - |
         telegram_bot_token_escaped=$$(printf '%s' "${ALERTMANAGER_TELEGRAM_BOT_TOKEN}" | sed -e 's/[&|]/\\&/g')
         email_from_escaped=$$(printf '%s' "${ALERTMANAGER_EMAIL_FROM}" | sed -e 's/[&|]/\\&/g')

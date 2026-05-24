@@ -219,6 +219,36 @@ WantedBy=multi-user.target
 - Routing is intentionally simple in this phase: no severity splitting yet.
 - Baseline thresholds in alert rules are starting defaults only.
 - Revisit thresholds after several days of production observation.
+- Required env for alerting:
+  - `ALERTMANAGER_TELEGRAM_BOT_TOKEN`
+  - `ALERTMANAGER_TELEGRAM_CHAT_ID`
+  - `ALERTMANAGER_EMAIL_FROM`
+  - `ALERTMANAGER_EMAIL_TO`
+  - `ALERTMANAGER_EMAIL_SMARTHOST`
+  - `ALERTMANAGER_EMAIL_AUTH_USERNAME`
+  - `ALERTMANAGER_EMAIL_AUTH_PASSWORD`
+  - `ALERTMANAGER_EMAIL_REQUIRE_TLS`
+- `Alertmanager` renders `/etc/alertmanager/alertmanager.yml.tpl` to `/tmp/alertmanager.yml` at container startup, then starts the real binary with that rendered config.
+- `vmalert` is the rule engine. `Alertmanager` only receives already-fired alerts and handles grouping and delivery.
+
+## Alerting checks
+
+After deploy:
+
+- `docker compose ps` should show `alertmanager` as `Up` with no restart loop.
+- Alertmanager logs must not contain `unexpected /bin/sh`.
+- `vmalert` must keep `-notifier.url=http://alertmanager:9093` healthy.
+
+End-to-end smoke test:
+
+1. Temporarily stop `redis_exporter` on the db VPS.
+2. Wait for the `RedisDown` alert to fire.
+3. Confirm the alert appears in `vmalert`.
+4. Confirm the alert appears in `Alertmanager`.
+5. Confirm the notification arrives in both `Telegram` and `email`.
+6. Start `redis_exporter` again and verify resolved notification delivery.
+
+Repeat the same flow with `postgres_exporter` and `PostgresDown`.
 
 ## Acceptance checklist
 
