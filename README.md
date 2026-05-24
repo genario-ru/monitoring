@@ -2,7 +2,7 @@
 
 This repository contains the self-hosted monitoring stack for `genario`:
 
-- `Caddy` publishes Grafana on `https://grafana.<your-domain>`
+- `Dokploy Domains` publishes Grafana on `https://grafana.<your-domain>`
 - `Grafana` renders dashboards
 - `VictoriaMetrics` stores, scrapes, and serves metrics
 - `vmalert` evaluates alert rules against `VictoriaMetrics`
@@ -17,7 +17,6 @@ This repository contains the self-hosted monitoring stack for `genario`:
 - `alertmanager/`: Alertmanager config
 - `grafana/provisioning/`: automatic datasource and dashboard provisioning
 - `grafana/dashboards/`: file-based dashboards committed to git
-- `caddy/`: public HTTPS reverse proxy config
 
 ## What this repository currently covers
 
@@ -42,8 +41,6 @@ This repository still does **not** include:
 
 1. Copy `.env.example` to `.env`.
 2. Set:
-   - `GRAFANA_DOMAIN`
-   - `ACME_EMAIL`
    - `GRAFANA_ADMIN_USER`
    - `GRAFANA_ADMIN_PASSWORD`
    - `APP_VPS_IP`
@@ -71,7 +68,8 @@ docker compose up -d
 
 After startup:
 
-- open `https://<GRAFANA_DOMAIN>`
+- configure a Dokploy domain for the `grafana` service on port `3000`
+- open the configured Grafana domain
 - log in with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`
 - confirm the `VictoriaMetrics` datasource is healthy
 - confirm the `Host Overview`, `Backend Overview`, `Postgres Overview`, and `Redis Overview` dashboards are present
@@ -188,6 +186,7 @@ WantedBy=multi-user.target
 - allow `monitoring VPS -> data VPS : 9187`
 - allow `monitoring VPS -> data VPS : 9121`
 - do **not** publish VictoriaMetrics, `vmalert`, or Alertmanager to the public internet
+- do **not** publish custom `80/443` ports from this compose stack; Dokploy already owns ingress on the server
 
 ## Alerts
 
