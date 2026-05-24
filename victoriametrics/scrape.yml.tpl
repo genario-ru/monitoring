@@ -10,14 +10,14 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - "%{APP_VPS_IP}:3000"
+          - "%{APP_DOMAIN}:3000"
 
   - job_name: app-node
     scrape_interval: 30s
     metrics_path: /metrics
     static_configs:
       - targets:
-          - "%{APP_VPS_IP}:9100"
+          - "%{APP_DOMAIN}:9100"
 
   - job_name: data-node
     scrape_interval: 30s

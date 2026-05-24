@@ -43,7 +43,7 @@ This repository still does **not** include:
 2. Set:
    - `GRAFANA_ADMIN_USER`
    - `GRAFANA_ADMIN_PASSWORD`
-   - `APP_VPS_IP`
+   - `APP_DOMAIN`
    - `DATA_VPS_IP`
    - `POSTGRES_EXPORTER_PORT`
    - `REDIS_EXPORTER_PORT`

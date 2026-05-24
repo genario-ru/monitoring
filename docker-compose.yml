@@ -43,8 +43,8 @@ services:
       - -c
       - |
         sed \
-          -e "s|%{APP_VPS_IP}|${APP_VPS_IP}|g" \
-          -e "s|%{DATA_VPS_IP}|${DATA_VPS_IP}|g" \
+          -e "s|%{APP_DOMAIN}|${APP_DOMAIN}|g" \
+          -e "s|%{DATA_DOMAIN}|${DATA_DOMAIN}|g" \
           -e "s|%{POSTGRES_EXPORTER_PORT}|${POSTGRES_EXPORTER_PORT}|g" \
           -e "s|%{REDIS_EXPORTER_PORT}|${REDIS_EXPORTER_PORT}|g" \
           /etc/victoriametrics-templates/scrape.yml.tpl > /etc/victoriametrics/scrape.yml
