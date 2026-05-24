@@ -402,12 +402,136 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "rate(genario_process_cpu_user_seconds_total{job=\"backend\"}[5m]) + rate(genario_process_cpu_system_seconds_total{job=\"backend\"}[5m])",
+          "expr": "rate(genario_process_cpu_seconds_total{job=\"backend\"}[5m])",
           "legendFormat": "cpu seconds/sec",
           "refId": "A"
         }
       ],
       "title": "Process CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "genario_nodejs_eventloop_lag_p50_seconds{job=\"backend\"}",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "genario_nodejs_eventloop_lag_p99_seconds{job=\"backend\"}",
+          "legendFormat": "p99",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "genario_nodejs_eventloop_lag_max_seconds{job=\"backend\"}",
+          "legendFormat": "max",
+          "refId": "C"
+        }
+      ],
+      "title": "Event Loop Lag",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rate(genario_nodejs_gc_duration_seconds_sum{job=\"backend\"}[5m]) / rate(genario_nodejs_gc_duration_seconds_count{job=\"backend\"}[5m])",
+          "legendFormat": "{{kind}} avg",
+          "refId": "A"
+        }
+      ],
+      "title": "GC Avg Duration",
       "type": "timeseries"
     },
     {
@@ -457,7 +581,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 24
+        "y": 32
       },
       "id": 8,
       "options": {
@@ -515,7 +639,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 24
+        "y": 32
       },
       "id": 9,
       "options": {
