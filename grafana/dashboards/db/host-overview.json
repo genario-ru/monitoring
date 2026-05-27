@@ -67,7 +67,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{job=\"backend-node\",mode=\"idle\"}[5m])) * 100)",
+          "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{job=\"db-node\",mode=\"idle\"}[5m])) * 100)",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -121,7 +121,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "100 * (1 - (node_memory_MemAvailable_bytes{job=\"backend-node\"} / node_memory_MemTotal_bytes{job=\"backend-node\"}))",
+          "expr": "100 * (1 - (node_memory_MemAvailable_bytes{job=\"db-node\"} / node_memory_MemTotal_bytes{job=\"db-node\"}))",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -175,7 +175,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "100 * (1 - (node_filesystem_avail_bytes{job=\"backend-node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=\"backend-node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}))",
+          "expr": "100 * (1 - (node_filesystem_avail_bytes{job=\"db-node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=\"db-node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}))",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -228,7 +228,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "node_load1{job=\"backend-node\"}",
+          "expr": "node_load1{job=\"db-node\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -281,7 +281,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (instance) (rate(node_network_receive_bytes_total{job=\"backend-node\",device!~\"lo|veth.*|docker.*\"}[5m]))",
+          "expr": "sum by (instance) (rate(node_network_receive_bytes_total{job=\"db-node\",device!~\"lo|veth.*|docker.*\"}[5m]))",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -339,7 +339,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "time() - node_boot_time_seconds{job=\"backend-node\"}",
+          "expr": "time() - node_boot_time_seconds{job=\"db-node\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -365,9 +365,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Host Overview",
-  "uid": "backend-host-overview",
+  "uid": "db-host-overview",
   "version": 1,
   "weekStart": ""
 }
-
-
