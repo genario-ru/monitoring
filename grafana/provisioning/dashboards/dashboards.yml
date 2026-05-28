@@ -17,3 +17,11 @@ providers:
     editable: true
     options:
       path: /etc/grafana/dashboards/db
+  - name: frontend
+    orgId: 1
+    folder: Frontend
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards/frontend

@@ -13,7 +13,7 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 - `docker-compose.yml`: monitoring stack definition
 - `.env.example`: required runtime variables
-- `scripts/`: bootstrap scripts for `backend VPS` and `db VPS`
+- `scripts/`: bootstrap scripts for `backend VPS`, `frontend VPS`, and `db VPS`
 - `victoriametrics/`: scrape configuration for `VictoriaMetrics`
 - `vmalert/`: alert rules for `vmalert`
 - `alertmanager/`: Alertmanager config
@@ -24,11 +24,13 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 - `backend` scrape target on `http://<backend-vps-ip>:3000/metrics`
 - `backend-node` scrape target on `http://<backend-vps-ip>:9100/metrics`
+- `frontend-node` scrape target on `http://<frontend-vps-ip>:9100/metrics`
 - `db-node` scrape target on `http://<db-vps-ip>:9100/metrics`
 - `postgres` scrape target on `http://<db-vps-ip>:<postgres-exporter-port>/metrics`
 - `redis` scrape target on `http://<db-vps-ip>:<redis-exporter-port>/metrics`
-- one host dashboard
-- one backend dashboard
+- one backend host dashboard
+- one backend API dashboard
+- one frontend host dashboard
 - one PostgreSQL dashboard
 - one Redis dashboard
 - baseline alert rules for backend, hosts, PostgreSQL, and Redis
@@ -48,6 +50,7 @@ This repository still does **not** include:
    - `GRAFANA_ADMIN_USER`
    - `GRAFANA_ADMIN_PASSWORD`
    - `BACKEND_VPS_DOMAIN`
+   - `FRONTEND_VPS_DOMAIN`
    - `DB_VPS_IP`
    - `POSTGRES_EXPORTER_PORT`
    - `REDIS_EXPORTER_PORT`
@@ -83,7 +86,7 @@ After startup:
 - open the configured Grafana domain
 - log in with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`
 - confirm the `VictoriaMetrics` datasource is healthy
-- confirm the `Host Overview`, `Backend Overview`, `Postgres Overview`, and `Redis Overview` dashboards are present
+- confirm the `Backend`, `Frontend`, and `DB` dashboard folders are present
 - open the configured GlitchTip domain
 - create the first GlitchTip user and organization
 - if `GLITCHTIP_EMAIL_URL=consolemail://`, use `docker compose logs -f glitchtip` to inspect outbound email output until SMTP is configured
@@ -105,6 +108,13 @@ Backend VPS:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-backend-vps.sh -o bootstrap-backend-vps.sh
 sudo env MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-backend-vps.sh
+```
+
+Frontend VPS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-frontend-vps.sh -o bootstrap-frontend-vps.sh
+sudo env MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-frontend-vps.sh
 ```
 
 DB VPS:
@@ -223,10 +233,23 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
+## Manual work on frontend VPS
+
+1. Install `node_exporter` as a `systemd` service.
+2. Open port `9100` **only** for the monitoring VPS IP.
+3. Verify that VictoriaMetrics shows `frontend-node` as `UP`.
+
+The bootstrap script already covers this setup for a fresh VPS:
+
+```bash
+sudo env MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-frontend-vps.sh
+```
+
 ## Firewall checklist
 
 - allow `monitoring VPS -> backend VPS : 3000`
 - allow `monitoring VPS -> backend VPS : 9100`
+- allow `monitoring VPS -> frontend VPS : 9100`
 - allow `monitoring VPS -> db VPS : 9100`
 - allow `monitoring VPS -> db VPS : 9187`
 - allow `monitoring VPS -> db VPS : 9121`
@@ -274,8 +297,9 @@ Repeat the same flow with `postgres_exporter` and `PostgresDown`.
 - `https://glitchtip.<domain>` is reachable over `HTTPS`
 - Grafana requires login
 - GlitchTip shows the setup/login screen and can create the first organization
-- `backend`, `backend-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
-- `Host Overview` shows CPU, memory, disk, load, network, uptime
+- `backend`, `backend-node`, `frontend-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
+- `Backend / Host Overview` shows CPU, memory, disk, load, network, uptime for the backend VPS
+- `Frontend / Host Overview` shows CPU, memory, disk, load, network, uptime for the frontend VPS
 - `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime
 - `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure
 - `Redis Overview` shows exporter health, Redis health, memory usage, clients, ops/sec, evictions, rejected connections, persistence health

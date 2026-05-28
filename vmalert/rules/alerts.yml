@@ -16,6 +16,13 @@ groups:
           summary: Backend VPS host metrics are down
           description: The node_exporter target on the backend VPS has been unreachable for more than 2 minutes.
 
+      - alert: FrontendNodeDown
+        expr: up{job="frontend-node"} == 0
+        for: 2m
+        annotations:
+          summary: Frontend VPS host metrics are down
+          description: The node_exporter target on the frontend VPS has been unreachable for more than 2 minutes.
+
       - alert: DbNodeDown
         expr: up{job="db-node"} == 0
         for: 2m
@@ -58,21 +65,21 @@ groups:
     interval: 30s
     rules:
       - alert: HostHighCpu
-        expr: 100 - (avg by (instance, job) (rate(node_cpu_seconds_total{mode="idle",job=~"backend-node|db-node"}[5m])) * 100) > 85
+        expr: 100 - (avg by (instance, job) (rate(node_cpu_seconds_total{mode="idle",job=~"backend-node|frontend-node|db-node"}[5m])) * 100) > 85
         for: 15m
         annotations:
           summary: Host CPU usage is high
           description: Host CPU usage has been above 85% for 15 minutes.
 
       - alert: HostLowMemory
-        expr: (1 - (node_memory_MemAvailable_bytes{job=~"backend-node|db-node"} / node_memory_MemTotal_bytes{job=~"backend-node|db-node"})) > 0.9
+        expr: (1 - (node_memory_MemAvailable_bytes{job=~"backend-node|frontend-node|db-node"} / node_memory_MemTotal_bytes{job=~"backend-node|frontend-node|db-node"})) > 0.9
         for: 15m
         annotations:
           summary: Host memory pressure is high
           description: Available memory has been below 10% for 15 minutes.
 
       - alert: HostDiskAlmostFull
-        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"backend-node|db-node"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"backend-node|db-node"})) > 0.9
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"backend-node|frontend-node|db-node"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay",job=~"backend-node|frontend-node|db-node"})) > 0.9
         for: 15m
         annotations:
           summary: Root filesystem is almost full
