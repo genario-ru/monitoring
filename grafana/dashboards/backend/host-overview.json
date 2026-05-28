@@ -364,10 +364,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Backend Host Overview",
+  "title": "Host Overview",
   "uid": "backend-host-overview",
   "version": 1,
   "weekStart": ""
 }
-
-
