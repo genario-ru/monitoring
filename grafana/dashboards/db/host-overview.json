@@ -364,7 +364,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Host Overview",
+  "title": "DB Host Overview",
   "uid": "db-host-overview",
   "version": 1,
   "weekStart": ""
