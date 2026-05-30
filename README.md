@@ -22,7 +22,7 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 ## What this repository currently covers
 
-- `backend` scrape target on `http://<backend-vps-ip>:3000/metrics`
+- `backend` scrape target on `https://<backend-domain>/metrics`
 - `backend-node` scrape target on `http://<backend-vps-ip>:9100/metrics`
 - `frontend-node` scrape target on `http://<frontend-vps-ip>:9100/metrics`
 - `monitoring-node` scrape target on `http://<monitoring-vps-ip>:9100/metrics`
@@ -151,7 +151,7 @@ METRICS_ALLOWED_IPS=<monitoring-vps-ip>
 
 4. Redeploy `genario-backend` after the `/metrics` code changes.
 5. Verify that:
-   - `curl http://127.0.0.1:3000/metrics` works from the backend host only if the source IP is allowlisted
+   - `curl https://<backend-domain>/metrics` works from the monitoring VPS when `METRICS_ALLOWED_IPS` contains the monitoring VPS public IP
    - VictoriaMetrics shows `backend` and `backend-node` as `UP`
 
 Example `node_exporter` service:
@@ -271,7 +271,7 @@ sudo bash bootstrap-monitoring-vps.sh
 
 ## Firewall checklist
 
-- allow `monitoring VPS -> backend VPS : 3000`
+- allow `monitoring VPS -> backend HTTPS domain : 443`
 - allow `monitoring VPS -> backend VPS : 9100`
 - allow `monitoring VPS -> frontend VPS : 9100`
 - allow `monitoring VPS -> db VPS : 9100`
