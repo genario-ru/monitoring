@@ -154,7 +154,7 @@ start containers or mutate remote hosts as part of default validation.
 2. Preserve `set -euo pipefail`.
 3. Keep scripts idempotent where possible: create users only when missing,
    overwrite known systemd units deliberately, and print clear next steps.
-4. Keep firewall rules scoped to `${MONITORING_VPS_IP}`.
+4. Keep firewall rules scoped to `${MONITORING_IP}`.
 5. Do not run scripts by default. Review them statically and report that runtime
    VPS validation was not performed unless the user explicitly asked.
 

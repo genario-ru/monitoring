@@ -31,7 +31,7 @@ POSTGRES_SKIP_ROLE_SETUP="${POSTGRES_SKIP_ROLE_SETUP:-false}"
 REDIS_EXPORTER_REDIS_ADDR="${REDIS_EXPORTER_REDIS_ADDR:-redis://127.0.0.1:6379}"
 REDIS_EXPORTER_REDIS_PASSWORD="${REDIS_EXPORTER_REDIS_PASSWORD:-}"
 
-MONITORING_VPS_IP="${MONITORING_VPS_IP:-}"
+MONITORING_IP="${MONITORING_IP:-}"
 
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
@@ -222,8 +222,8 @@ enable_services() {
 }
 
 configure_ufw() {
-  if [[ -z "${MONITORING_VPS_IP}" ]]; then
-    echo "Skipping UFW rules: MONITORING_VPS_IP is not set."
+  if [[ -z "${MONITORING_IP}" ]]; then
+    echo "Skipping UFW rules: MONITORING_IP is not set."
     return
   fi
 
@@ -232,9 +232,9 @@ configure_ufw() {
     return
   fi
 
-  ufw allow from "${MONITORING_VPS_IP}" to any port "${NODE_EXPORTER_PORT}" proto tcp
-  ufw allow from "${MONITORING_VPS_IP}" to any port "${POSTGRES_EXPORTER_PORT}" proto tcp
-  ufw allow from "${MONITORING_VPS_IP}" to any port "${REDIS_EXPORTER_PORT}" proto tcp
+  ufw allow from "${MONITORING_IP}" to any port "${NODE_EXPORTER_PORT}" proto tcp
+  ufw allow from "${MONITORING_IP}" to any port "${POSTGRES_EXPORTER_PORT}" proto tcp
+  ufw allow from "${MONITORING_IP}" to any port "${REDIS_EXPORTER_PORT}" proto tcp
 }
 
 print_summary() {

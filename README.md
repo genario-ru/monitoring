@@ -24,7 +24,7 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 ## What this repository currently covers
 
-- `backend` scrape target on `https://<backend-domain>/metrics`
+- `backend` scrape targets on `https://<backend-domain>/metrics` and `https://<stage-backend-domain>/metrics`
 - `backend-node` scrape target on `http://<backend-vps-ip>:9100/metrics`
 - `frontend-node` scrape target on `http://<frontend-vps-ip>:9100/metrics`
 - `monitoring-node` scrape target on `http://<monitoring-vps-ip>:9100/metrics`
@@ -53,10 +53,11 @@ This repository still does **not** include:
 2. Set:
    - `GRAFANA_ADMIN_USER`
    - `GRAFANA_ADMIN_PASSWORD`
-   - `BACKEND_VPS_DOMAIN`
-   - `FRONTEND_VPS_DOMAIN`
-   - `MONITORING_VPS_IP`
-   - `DB_VPS_IP`
+   - `BACKEND_PRODUCTION_DOMAIN`
+   - `BACKEND_STAGE_DOMAIN`
+   - `FRONTEND_PRODUCTION_DOMAIN`
+   - `MONITORING_IP`
+   - `DB_IP`
    - `POSTGRES_EXPORTER_PORT`
    - `REDIS_EXPORTER_PORT`
    - `ALERTMANAGER_EMAIL_FROM`
@@ -119,14 +120,14 @@ Backend VPS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-backend-vps.sh -o bootstrap-backend-vps.sh
-sudo env MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-backend-vps.sh
+sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-backend-vps.sh
 ```
 
 Frontend VPS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-frontend-vps.sh -o bootstrap-frontend-vps.sh
-sudo env MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-frontend-vps.sh
+sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-frontend-vps.sh
 ```
 
 Monitoring VPS:
@@ -140,11 +141,11 @@ DB VPS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-db-vps.sh -o bootstrap-db-vps.sh
-sudo env MONITORING_VPS_IP=<monitoring-vps-ip> POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> bash bootstrap-db-vps.sh
+sudo env MONITORING_IP=<monitoring-ip> POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> bash bootstrap-db-vps.sh
 ```
 
 The scripts install exporters, create system users, write `systemd` units,
-start services, and optionally add `ufw` rules if `MONITORING_VPS_IP` is set.
+start services, and optionally add `ufw` rules if `MONITORING_IP` is set.
 If the server does not have a local Unix user named `postgres`, the DB bootstrap
 script can connect through regular PostgreSQL admin credentials instead.
 
@@ -161,6 +162,7 @@ METRICS_ALLOWED_IPS=<monitoring-vps-ip>
 4. Redeploy `genario-backend` after the `/metrics` code changes.
 5. Verify that:
    - `curl https://<backend-domain>/metrics` works from the monitoring VPS when `METRICS_ALLOWED_IPS` contains the monitoring VPS public IP
+   - `curl https://<stage-backend-domain>/metrics` works from the monitoring VPS when `METRICS_ALLOWED_IPS` contains the monitoring VPS public IP
    - VictoriaMetrics shows `backend` and `backend-node` as `UP`
 
 Example `node_exporter` service:
@@ -261,13 +263,13 @@ WantedBy=multi-user.target
 The bootstrap script already covers this setup for a fresh VPS:
 
 ```bash
-sudo env MONITORING_VPS_IP=<monitoring-vps-ip> bash bootstrap-frontend-vps.sh
+sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-frontend-vps.sh
 ```
 
 ## Manual work on monitoring VPS
 
 1. Install `node_exporter` as a `systemd` service.
-2. Set `MONITORING_VPS_IP` in `genario-monitoring` runtime env.
+2. Set `MONITORING_IP` in `genario-monitoring` runtime env.
 3. Redeploy `genario-monitoring`.
 4. Verify that VictoriaMetrics shows `monitoring-node` as `UP`.
 5. If you later enable a host firewall on the monitoring VPS, make sure Docker containers running the monitoring stack can still reach port `9100` on the host.
@@ -330,12 +332,13 @@ Repeat the same flow with `postgres_exporter` and `PostgresDown`.
 - `https://glitchtip.<domain>` is reachable over `HTTPS`
 - Grafana requires login
 - GlitchTip shows the setup/login screen and can create the first organization
-- `backend`, `backend-node`, `frontend-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
-- `backend`, `backend-node`, `frontend-node`, `monitoring-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
+- `backend` has both `production` and `staging` targets `UP` in VictoriaMetrics
+- `backend-node`, `frontend-node`, `monitoring-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
 - `Backend / Host Overview` shows CPU, memory, disk, load, network, uptime for the backend VPS
 - `Frontend / Host Overview` shows CPU, memory, disk, load, network, uptime for the frontend VPS
 - `Monitoring / Host Overview` shows CPU, memory, disk, load, network, uptime for the monitoring VPS
-- `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime
+- `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime for the selected backend environment
+- `Backend / API Endpoints` lets you switch between `production` and `staging` on the same dashboard
 - `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure
 - `Redis Overview` shows exporter health, Redis health, memory usage, clients, ops/sec, evictions, rejected connections, persistence health
 - `/metrics` on the backend is only accessible from the allowlisted monitoring IP

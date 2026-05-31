@@ -4,7 +4,7 @@ set -euo pipefail
 NODE_EXPORTER_VERSION="${NODE_EXPORTER_VERSION:-1.9.1}"
 NODE_EXPORTER_USER="${NODE_EXPORTER_USER:-node_exporter}"
 NODE_EXPORTER_PORT="${NODE_EXPORTER_PORT:-9100}"
-MONITORING_VPS_IP="${MONITORING_VPS_IP:-}"
+MONITORING_IP="${MONITORING_IP:-}"
 
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
@@ -64,8 +64,8 @@ enable_service() {
 }
 
 configure_ufw() {
-  if [[ -z "${MONITORING_VPS_IP}" ]]; then
-    echo "Skipping UFW rule: MONITORING_VPS_IP is not set."
+  if [[ -z "${MONITORING_IP}" ]]; then
+    echo "Skipping UFW rule: MONITORING_IP is not set."
     return
   fi
 
@@ -74,7 +74,7 @@ configure_ufw() {
     return
   fi
 
-  ufw allow from "${MONITORING_VPS_IP}" to any port "${NODE_EXPORTER_PORT}" proto tcp
+  ufw allow from "${MONITORING_IP}" to any port "${NODE_EXPORTER_PORT}" proto tcp
 }
 
 print_summary() {

@@ -74,7 +74,7 @@ Next:
 1. Verify locally on the monitoring VPS:
    curl http://127.0.0.1:${NODE_EXPORTER_PORT}/metrics
 2. In genario-monitoring env, set:
-   MONITORING_VPS_IP=<monitoring-vps-ip>
+   MONITORING_IP=<monitoring-ip>
 3. Redeploy genario-monitoring.
 4. Verify that VictoriaMetrics shows monitoring-node as UP.
 
