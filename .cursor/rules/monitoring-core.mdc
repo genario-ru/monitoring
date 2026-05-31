@@ -1,0 +1,21 @@
+---
+description: Core rules for Genario monitoring infrastructure changes
+alwaysApply: true
+---
+
+# Monitoring Core
+
+- Treat `AGENTS.md` as the canonical project contract.
+- This repository manages production monitoring infrastructure, not application code.
+- Do not commit secrets, real `.env` values, SMTP credentials, GlitchTip secrets, or production tokens.
+- Do not run mutating Docker or VPS commands unless the user explicitly asks for that exact command in the current task.
+- Safe default validation is `docker compose --env-file .env.example config` plus local file syntax checks.
+- Keep job names stable. If a scrape `job_name` changes, update dashboards, alerts, and README together.
+- Keep Grafana datasource UID as `victoriametrics`.
+- Keep internal services internal: VictoriaMetrics, vmalert, Alertmanager, exporter ports, GlitchTip PostgreSQL, and GlitchTip Valkey should not be publicly published.
+
+## Required Finish Check
+
+- List changed monitoring surfaces: compose/env, scrape jobs, alert rules, dashboards, bootstrap scripts, docs.
+- State whether any public port, firewall, secret, or volume behavior changed.
+- State which validation commands were run and which runtime checks were intentionally not run.

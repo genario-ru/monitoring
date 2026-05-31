@@ -1,0 +1,17 @@
+---
+description: Required validation matrix before finishing monitoring changes
+alwaysApply: true
+---
+
+# Monitoring Validation
+
+Choose checks by changed area:
+
+- Compose/env: `docker compose --env-file .env.example config`.
+- Grafana dashboards: parse changed JSON files and verify datasource UID/job names.
+- YAML configs: parse or run available YAML/config checks.
+- Alert rules: verify PromQL uses existing metric/job names; run runtime alert tests only when explicitly requested.
+- Bootstrap scripts: static review and shell syntax checks when available; do not execute scripts by default.
+- Docs-only: Prettier/Markdown formatting when available and stale-reference search.
+
+Always report skipped checks and why. Do not imply that containers were started or VPS scripts were tested when only static validation was performed.

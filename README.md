@@ -13,6 +13,8 @@ This repository contains the self-hosted monitoring stack for `genario`:
 
 - `docker-compose.yml`: monitoring stack definition
 - `.env.example`: required runtime variables
+- `AGENTS.md`: canonical instructions for AI agents working in this repository
+- `.agents/`, `.cursor/`, `.claude/`: tool-specific AI workflows derived from `AGENTS.md`
 - `scripts/`: bootstrap scripts for `backend VPS`, `frontend VPS`, `monitoring VPS`, and `db VPS`
 - `victoriametrics/`: scrape configuration for `VictoriaMetrics`
 - `vmalert/`: alert rules for `vmalert`
@@ -73,6 +75,13 @@ This repository still does **not** include:
 4. Keep `GLITCHTIP_ENABLE_ADMIN=false`, `GLITCHTIP_ENABLE_OPENAPI=false`, and `GLITCHTIP_ENABLE_MCP=false` unless you explicitly need them.
 5. `GLITCHTIP_EMAIL_URL=consolemail://` is acceptable for first boot and testing. For production, replace it with a real SMTP URL so invites, password resets, and notifications leave the container.
 6. Keep all Alertmanager and GlitchTip secrets only in the real `.env` on the monitoring VPS; never commit them to git.
+
+## AI agent safety policy
+
+- Agents may run read-only validation such as `docker compose --env-file .env.example config`.
+- Agents must not run `docker compose up`, `docker compose down`, `docker compose pull`, `docker compose restart`, `docker compose exec`, destructive Docker volume commands, or `scripts/bootstrap-*.sh` unless the user explicitly asks for that exact operation in the current task.
+- Agents must not commit real `.env` values, SMTP credentials, GlitchTip secrets, IP allowlists, or production tokens.
+- Infrastructure changes should report which dashboards, alert rules, scrape jobs, env variables, and firewall assumptions were checked.
 
 ## Deploy on monitoring VPS
 
