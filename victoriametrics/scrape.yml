@@ -17,7 +17,7 @@ scrape_configs:
       - targets:
           - "%{BACKEND_STAGE_DOMAIN}"
         labels:
-          backend_environment: staging
+          backend_environment: stage
 
   - job_name: backend-node
     scrape_interval: 30s

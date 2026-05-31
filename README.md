@@ -332,13 +332,13 @@ Repeat the same flow with `postgres_exporter` and `PostgresDown`.
 - `https://glitchtip.<domain>` is reachable over `HTTPS`
 - Grafana requires login
 - GlitchTip shows the setup/login screen and can create the first organization
-- `backend` has both `production` and `staging` targets `UP` in VictoriaMetrics
+- `backend` has both `production` and `stage` targets `UP` in VictoriaMetrics
 - `backend-node`, `frontend-node`, `monitoring-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
 - `Backend / Host Overview` shows CPU, memory, disk, load, network, uptime for the backend VPS
 - `Frontend / Host Overview` shows CPU, memory, disk, load, network, uptime for the frontend VPS
 - `Monitoring / Host Overview` shows CPU, memory, disk, load, network, uptime for the monitoring VPS
 - `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime for the selected backend environment
-- `Backend / API Endpoints` lets you switch between `production` and `staging` on the same dashboard
+- `Backend / API Endpoints` lets you switch between `production` and `stage` on the same dashboard
 - `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure
 - `Redis Overview` shows exporter health, Redis health, memory usage, clients, ops/sec, evictions, rejected connections, persistence health
 - `/metrics` on the backend is only accessible from the allowlisted monitoring IP
