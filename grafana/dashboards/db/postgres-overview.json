@@ -87,7 +87,7 @@
       },
       "targets": [
         {
-          "expr": "min(up{job=\"postgres\"})",
+          "expr": "min(up{job=\"postgres\",db_environment=~\"$environment\"})",
           "legendFormat": "scrape",
           "refId": "A"
         }
@@ -161,7 +161,7 @@
       },
       "targets": [
         {
-          "expr": "min(pg_up{job=\"postgres\"})",
+          "expr": "min(pg_up{job=\"postgres\",db_environment=~\"$environment\"})",
           "legendFormat": "pg_up",
           "refId": "A"
         }
@@ -210,7 +210,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (instance) (pg_stat_activity_count{job=\"postgres\"})",
+          "expr": "sum by (instance) (pg_stat_activity_count{job=\"postgres\",db_environment=~\"$environment\"})",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -259,7 +259,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (instance) (rate(pg_stat_database_xact_commit{job=\"postgres\"}[5m]) + rate(pg_stat_database_xact_rollback{job=\"postgres\"}[5m]))",
+          "expr": "sum by (instance) (rate(pg_stat_database_xact_commit{job=\"postgres\",db_environment=~\"$environment\"}[5m]) + rate(pg_stat_database_xact_rollback{job=\"postgres\",db_environment=~\"$environment\"}[5m]))",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -308,7 +308,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (instance) (pg_database_size_bytes{job=\"postgres\"})",
+          "expr": "sum by (instance) (pg_database_size_bytes{job=\"postgres\",db_environment=~\"$environment\"})",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -357,7 +357,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (instance) (rate(pg_stat_database_deadlocks{job=\"postgres\"}[5m]))",
+          "expr": "sum by (instance) (rate(pg_stat_database_deadlocks{job=\"postgres\",db_environment=~\"$environment\"}[5m]))",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -406,7 +406,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (instance) (rate(pg_stat_bgwriter_checkpoints_timed{job=\"postgres\"}[5m]) + rate(pg_stat_bgwriter_checkpoints_req{job=\"postgres\"}[5m]))",
+          "expr": "sum by (instance) (rate(pg_stat_bgwriter_checkpoints_timed{job=\"postgres\",db_environment=~\"$environment\"}[5m]) + rate(pg_stat_bgwriter_checkpoints_req{job=\"postgres\",db_environment=~\"$environment\"}[5m]))",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -423,7 +423,32 @@
     "postgres"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "production",
+          "value": "production"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
+        "definition": "label_values(up{job=\"postgres\"}, db_environment)",
+        "includeAll": true,
+        "label": "Environment",
+        "multi": false,
+        "name": "environment",
+        "options": [],
+        "query": {
+          "query": "label_values(up{job=\"postgres\"}, db_environment)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-6h",
@@ -436,4 +461,3 @@
   "version": 1,
   "weekStart": ""
 }
-

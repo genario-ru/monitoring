@@ -87,7 +87,7 @@
       },
       "targets": [
         {
-          "expr": "min(up{job=\"redis\"})",
+          "expr": "min(up{job=\"redis\",db_environment=~\"$environment\"})",
           "legendFormat": "scrape",
           "refId": "A"
         }
@@ -161,7 +161,7 @@
       },
       "targets": [
         {
-          "expr": "min(redis_up{job=\"redis\"})",
+          "expr": "min(redis_up{job=\"redis\",db_environment=~\"$environment\"})",
           "legendFormat": "redis_up",
           "refId": "A"
         }
@@ -210,7 +210,7 @@
       },
       "targets": [
         {
-          "expr": "redis_memory_used_bytes{job=\"redis\"}",
+          "expr": "redis_memory_used_bytes{job=\"redis\",db_environment=~\"$environment\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -259,7 +259,7 @@
       },
       "targets": [
         {
-          "expr": "redis_connected_clients{job=\"redis\"}",
+          "expr": "redis_connected_clients{job=\"redis\",db_environment=~\"$environment\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -308,7 +308,7 @@
       },
       "targets": [
         {
-          "expr": "rate(redis_commands_processed_total{job=\"redis\"}[5m])",
+          "expr": "rate(redis_commands_processed_total{job=\"redis\",db_environment=~\"$environment\"}[5m])",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -357,7 +357,7 @@
       },
       "targets": [
         {
-          "expr": "rate(redis_evicted_keys_total{job=\"redis\"}[5m])",
+          "expr": "rate(redis_evicted_keys_total{job=\"redis\",db_environment=~\"$environment\"}[5m])",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -406,7 +406,7 @@
       },
       "targets": [
         {
-          "expr": "rate(redis_rejected_connections_total{job=\"redis\"}[5m])",
+          "expr": "rate(redis_rejected_connections_total{job=\"redis\",db_environment=~\"$environment\"}[5m])",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -455,12 +455,12 @@
       },
       "targets": [
         {
-          "expr": "redis_rdb_last_bgsave_status{job=\"redis\"}",
+          "expr": "redis_rdb_last_bgsave_status{job=\"redis\",db_environment=~\"$environment\"}",
           "legendFormat": "rdb save {{instance}}",
           "refId": "A"
         },
         {
-          "expr": "redis_aof_last_rewrite_status{job=\"redis\"}",
+          "expr": "redis_aof_last_rewrite_status{job=\"redis\",db_environment=~\"$environment\"}",
           "legendFormat": "aof rewrite {{instance}}",
           "refId": "B"
         }
@@ -477,7 +477,32 @@
     "redis"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "production",
+          "value": "production"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
+        "definition": "label_values(up{job=\"redis\"}, db_environment)",
+        "includeAll": true,
+        "label": "Environment",
+        "multi": false,
+        "name": "environment",
+        "options": [],
+        "query": {
+          "query": "label_values(up{job=\"redis\"}, db_environment)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-6h",
@@ -490,4 +515,3 @@
   "version": 1,
   "weekStart": ""
 }
-

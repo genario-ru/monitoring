@@ -53,6 +53,12 @@ scrape_configs:
     static_configs:
       - targets:
           - "%{DB_IP}:%{POSTGRES_EXPORTER_PORT}"
+        labels:
+          db_environment: production
+      - targets:
+          - "%{DB_IP}:%{POSTGRES_STAGE_EXPORTER_PORT}"
+        labels:
+          db_environment: stage
 
   - job_name: redis
     scrape_interval: 30s
@@ -60,3 +66,9 @@ scrape_configs:
     static_configs:
       - targets:
           - "%{DB_IP}:%{REDIS_EXPORTER_PORT}"
+        labels:
+          db_environment: production
+      - targets:
+          - "%{DB_IP}:%{REDIS_STAGE_EXPORTER_PORT}"
+        labels:
+          db_environment: stage

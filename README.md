@@ -29,8 +29,8 @@ This repository contains the self-hosted monitoring stack for `genario`:
 - `frontend-node` scrape target on `http://<frontend-vps-ip>:9100/metrics`
 - `monitoring-node` scrape target on `http://<monitoring-vps-ip>:9100/metrics`
 - `db-node` scrape target on `http://<db-vps-ip>:9100/metrics`
-- `postgres` scrape target on `http://<db-vps-ip>:<postgres-exporter-port>/metrics`
-- `redis` scrape target on `http://<db-vps-ip>:<redis-exporter-port>/metrics`
+- `postgres` scrape targets for the `production` and `stage` PostgreSQL instances on `http://<db-vps-ip>:<postgres-exporter-port>/metrics` and `http://<db-vps-ip>:<postgres-stage-exporter-port>/metrics`
+- `redis` scrape targets for the `production` and `stage` Redis instances on `http://<db-vps-ip>:<redis-exporter-port>/metrics` and `http://<db-vps-ip>:<redis-stage-exporter-port>/metrics`
 - one backend host dashboard
 - one backend API dashboard
 - one frontend host dashboard
@@ -60,6 +60,8 @@ This repository still does **not** include:
    - `DB_IP`
    - `POSTGRES_EXPORTER_PORT`
    - `REDIS_EXPORTER_PORT`
+   - `POSTGRES_STAGE_EXPORTER_PORT`
+   - `REDIS_STAGE_EXPORTER_PORT`
    - `ALERTMANAGER_EMAIL_FROM`
    - `ALERTMANAGER_EMAIL_TO`
    - `ALERTMANAGER_EMAIL_SMARTHOST`
@@ -116,33 +118,52 @@ After startup:
 You can bootstrap new servers with repo scripts instead of repeating the
 manual install steps.
 
+Copy the script from your local clone of this repository to the target VPS
+with `scp`, then run it over SSH.
+
 Backend VPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-backend-vps.sh -o bootstrap-backend-vps.sh
+scp scripts/bootstrap-backend-vps.sh <user>@<backend-vps-ip>:~/
+ssh <user>@<backend-vps-ip>
 sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-backend-vps.sh
 ```
 
 Frontend VPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-frontend-vps.sh -o bootstrap-frontend-vps.sh
+scp scripts/bootstrap-frontend-vps.sh <user>@<frontend-vps-ip>:~/
+ssh <user>@<frontend-vps-ip>
 sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-frontend-vps.sh
 ```
 
 Monitoring VPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-monitoring-vps.sh -o bootstrap-monitoring-vps.sh
+scp scripts/bootstrap-monitoring-vps.sh <user>@<monitoring-vps-ip>:~/
+ssh <user>@<monitoring-vps-ip>
 sudo bash bootstrap-monitoring-vps.sh
 ```
 
 DB VPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/scripts/bootstrap-db-vps.sh -o bootstrap-db-vps.sh
-sudo env MONITORING_IP=<monitoring-ip> POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> bash bootstrap-db-vps.sh
+scp scripts/bootstrap-db-vps.sh <user>@<db-vps-ip>:~/
+ssh <user>@<db-vps-ip>
+sudo env MONITORING_IP=<monitoring-ip> POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> STAGE_DB_ENABLED=true bash bootstrap-db-vps.sh
 ```
+
+If the stage PostgreSQL and Redis instances run on the same DB VPS,
+`STAGE_DB_ENABLED=true` makes the single script run also install
+`postgres_exporter_stage` and `redis_exporter_stage` units. Defaults assume
+stage PostgreSQL on `127.0.0.1:5433` and stage Redis on `127.0.0.1:6380`;
+override `POSTGRES_STAGE_DB_PORT`, `REDIS_STAGE_EXPORTER_REDIS_ADDR`,
+`POSTGRES_STAGE_EXPORTER_PORT` (default `9188`), and
+`REDIS_STAGE_EXPORTER_PORT` (default `9122`) if your layout differs. Stage
+exporter credentials default to the production ones; set
+`POSTGRES_STAGE_EXPORTER_DB_PASSWORD` and
+`REDIS_STAGE_EXPORTER_REDIS_PASSWORD` to override. Without
+`STAGE_DB_ENABLED=true` the script installs only the production exporters.
 
 The scripts install exporters, create system users, write `systemd` units,
 start services, and optionally add `ufw` rules if `MONITORING_IP` is set.
@@ -196,8 +217,9 @@ GRANT pg_monitor TO postgres_exporter;
 
 4. Install `postgres_exporter` as a `systemd` service.
 5. Install `redis_exporter` as a `systemd` service.
-6. Open ports `9187` and `9121` **only** for the monitoring VPS IP.
-7. Verify that VictoriaMetrics shows `db-node`, `postgres`, and `redis` as `UP`.
+6. If a stage PostgreSQL (`5433`) and Redis (`6380`) instance run on the same VPS, repeat steps 3-5 for them: create the monitoring role in the stage PostgreSQL instance and install `postgres_exporter_stage` / `redis_exporter_stage` units on ports `9188` and `9122`.
+7. Open ports `9187` and `9121` (plus `9188` and `9122` for stage) **only** for the monitoring VPS IP.
+8. Verify that VictoriaMetrics shows `db-node`, both `postgres` targets, and both `redis` targets as `UP`.
 
 Example `postgres_exporter` DSN:
 
@@ -288,6 +310,8 @@ sudo bash bootstrap-monitoring-vps.sh
 - allow `monitoring VPS -> db VPS : 9100`
 - allow `monitoring VPS -> db VPS : 9187`
 - allow `monitoring VPS -> db VPS : 9121`
+- allow `monitoring VPS -> db VPS : 9188` (stage PostgreSQL exporter)
+- allow `monitoring VPS -> db VPS : 9122` (stage Redis exporter)
 - do **not** publish VictoriaMetrics, `vmalert`, or Alertmanager to the public internet
 - do **not** publish custom `80/443` ports from this compose stack; Dokploy already owns ingress on the server
 
@@ -333,13 +357,14 @@ Repeat the same flow with `postgres_exporter` and `PostgresDown`.
 - Grafana requires login
 - GlitchTip shows the setup/login screen and can create the first organization
 - `backend` has both `production` and `stage` targets `UP` in VictoriaMetrics
-- `backend-node`, `frontend-node`, `monitoring-node`, `db-node`, `postgres`, and `redis` are `UP` in VictoriaMetrics
+- `backend-node`, `frontend-node`, `monitoring-node`, and `db-node` are `UP` in VictoriaMetrics
+- `postgres` and `redis` have both `production` and `stage` targets `UP` in VictoriaMetrics
 - `Backend / Host Overview` shows CPU, memory, disk, load, network, uptime for the backend VPS
 - `Frontend / Host Overview` shows CPU, memory, disk, load, network, uptime for the frontend VPS
 - `Monitoring / Host Overview` shows CPU, memory, disk, load, network, uptime for the monitoring VPS
 - `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime for the selected backend environment
 - `Backend / API Endpoints` lets you switch between `production` and `stage` on the same dashboard
-- `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure
-- `Redis Overview` shows exporter health, Redis health, memory usage, clients, ops/sec, evictions, rejected connections, persistence health
+- `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure, and lets you switch between `production` and `stage` instances
+- `Redis Overview` shows exporter health, Redis health, memory usage, clients, ops/sec, evictions, rejected connections, persistence health, and lets you switch between `production` and `stage` instances
 - `/metrics` on the backend is only accessible from the allowlisted monitoring IP
 - stopping `postgres_exporter` or `redis_exporter` produces a test alert delivered to `email`
