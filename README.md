@@ -150,25 +150,53 @@ DB VPS:
 ```bash
 scp scripts/bootstrap-db-vps.sh <user>@<db-vps-ip>:~/
 ssh <user>@<db-vps-ip>
-sudo env MONITORING_IP=<monitoring-ip> POSTGRES_EXPORTER_DB_PASSWORD=<strong-password> POSTGRES_ADMIN_DB_USER=<postgres-admin-user-if-no-local-postgres-user> POSTGRES_ADMIN_DB_PASSWORD=<postgres-admin-password-if-no-local-postgres-user> REDIS_EXPORTER_REDIS_PASSWORD=<redis-password-if-needed> STAGE_DB_ENABLED=true bash bootstrap-db-vps.sh
+sudo env \
+  MONITORING_IP=<monitoring-ip> \
+  POSTGRES_DB_PORT=5432 \
+  POSTGRES_STAGE_DB_PORT=5433 \
+  REDIS_PORT=6379 \
+  REDIS_STAGE_PORT=6380 \
+  POSTGRES_EXPORTER_DB_PASSWORD=<new-password-for-the-exporter-role> \
+  POSTGRES_ADMIN_DB_USER=<production-postgres-admin-user> \
+  POSTGRES_ADMIN_DB_PASSWORD=<production-postgres-admin-password> \
+  POSTGRES_STAGE_ADMIN_DB_USER=<stage-postgres-admin-user> \
+  POSTGRES_STAGE_ADMIN_DB_PASSWORD=<stage-postgres-admin-password> \
+  bash bootstrap-db-vps.sh
 ```
 
-If the stage PostgreSQL and Redis instances run on the same DB VPS,
-`STAGE_DB_ENABLED=true` makes the single script run also install
-`postgres_exporter_stage` and `redis_exporter_stage` units. Defaults assume
-stage PostgreSQL on `127.0.0.1:5433` and stage Redis on `127.0.0.1:6380`;
-override `POSTGRES_STAGE_DB_PORT`, `REDIS_STAGE_EXPORTER_REDIS_ADDR`,
-`POSTGRES_STAGE_EXPORTER_PORT` (default `9188`), and
-`REDIS_STAGE_EXPORTER_PORT` (default `9122`) if your layout differs. Stage
-exporter credentials default to the production ones; set
-`POSTGRES_STAGE_EXPORTER_DB_PASSWORD` and
-`REDIS_STAGE_EXPORTER_REDIS_PASSWORD` to override. Without
-`STAGE_DB_ENABLED=true` the script installs only the production exporters.
+The script installs an exporter for every database whose port you pass:
+
+- `POSTGRES_DB_PORT` (default `5432`) -> `postgres_exporter` listening on `9187`
+- `POSTGRES_STAGE_DB_PORT` (no default; set it only if a stage PostgreSQL
+  instance runs on this VPS) -> `postgres_exporter_stage` listening on `9188`
+- `REDIS_PORT` (default `6379`) -> `redis_exporter` listening on `9121`
+- `REDIS_STAGE_PORT` (no default; set it only if a stage Redis instance runs
+  on this VPS) -> `redis_exporter_stage` listening on `9122`
+
+Passwords and credentials:
+
+- `POSTGRES_EXPORTER_DB_PASSWORD` is a **new** password you invent for the
+  `postgres_exporter` monitoring role. The script creates that role in every
+  monitored PostgreSQL instance.
+- `POSTGRES_ADMIN_DB_USER` / `POSTGRES_ADMIN_DB_PASSWORD` are the superuser
+  credentials of the production PostgreSQL instance; they are needed to create
+  the monitoring role. `POSTGRES_STAGE_ADMIN_DB_USER` /
+  `POSTGRES_STAGE_ADMIN_DB_PASSWORD` are the same for the stage instance and
+  default to the production values. If a local Unix user `postgres` exists on
+  the VPS, admin credentials are not needed at all.
+- `REDIS_PASSWORD` / `REDIS_STAGE_PASSWORD` are only needed when the Redis
+  instances require auth.
+- To manage the PostgreSQL monitoring role yourself instead of letting the
+  script create it, pass `POSTGRES_SKIP_ROLE_SETUP=true` and run this in every
+  instance manually:
+
+```sql
+CREATE USER postgres_exporter WITH PASSWORD '<same-as-POSTGRES_EXPORTER_DB_PASSWORD>';
+GRANT pg_monitor TO postgres_exporter;
+```
 
 The scripts install exporters, create system users, write `systemd` units,
 start services, and optionally add `ufw` rules if `MONITORING_IP` is set.
-If the server does not have a local Unix user named `postgres`, the DB bootstrap
-script can connect through regular PostgreSQL admin credentials instead.
 
 ## Manual work on backend VPS
 

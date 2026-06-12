@@ -1,47 +1,59 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Exporter versions.
 NODE_EXPORTER_VERSION="${NODE_EXPORTER_VERSION:-1.9.1}"
 POSTGRES_EXPORTER_VERSION="${POSTGRES_EXPORTER_VERSION:-0.17.1}"
 REDIS_EXPORTER_VERSION="${REDIS_EXPORTER_VERSION:-1.67.0}"
 
+# System users the exporters run as.
 NODE_EXPORTER_USER="${NODE_EXPORTER_USER:-node_exporter}"
 POSTGRES_EXPORTER_USER="${POSTGRES_EXPORTER_USER:-postgres_exporter}"
 REDIS_EXPORTER_USER="${REDIS_EXPORTER_USER:-redis_exporter}"
 
+# Ports the exporters listen on (scraped by the monitoring VPS).
 NODE_EXPORTER_PORT="${NODE_EXPORTER_PORT:-9100}"
 POSTGRES_EXPORTER_PORT="${POSTGRES_EXPORTER_PORT:-9187}"
 REDIS_EXPORTER_PORT="${REDIS_EXPORTER_PORT:-9121}"
+POSTGRES_STAGE_EXPORTER_PORT="${POSTGRES_STAGE_EXPORTER_PORT:-9188}"
+REDIS_STAGE_EXPORTER_PORT="${REDIS_STAGE_EXPORTER_PORT:-9122}"
 
-POSTGRES_EXPORTER_DB_HOST="${POSTGRES_EXPORTER_DB_HOST:-127.0.0.1}"
-POSTGRES_EXPORTER_DB_PORT="${POSTGRES_EXPORTER_DB_PORT:-5432}"
-POSTGRES_EXPORTER_DB_NAME="${POSTGRES_EXPORTER_DB_NAME:-postgres}"
-POSTGRES_EXPORTER_DB_USER="${POSTGRES_EXPORTER_DB_USER:-postgres_exporter}"
-POSTGRES_EXPORTER_DB_PASSWORD="${POSTGRES_EXPORTER_DB_PASSWORD:-}"
+# Monitored PostgreSQL instances. The production instance is always monitored.
+# The stage instance is monitored only when POSTGRES_STAGE_DB_PORT is set.
+POSTGRES_DB_HOST="${POSTGRES_DB_HOST:-127.0.0.1}"
+POSTGRES_DB_PORT="${POSTGRES_DB_PORT:-5432}"
+POSTGRES_DB_NAME="${POSTGRES_DB_NAME:-postgres}"
+POSTGRES_STAGE_DB_HOST="${POSTGRES_STAGE_DB_HOST:-127.0.0.1}"
+POSTGRES_STAGE_DB_PORT="${POSTGRES_STAGE_DB_PORT:-}"
+POSTGRES_STAGE_DB_NAME="${POSTGRES_STAGE_DB_NAME:-postgres}"
 POSTGRES_SSLMODE="${POSTGRES_SSLMODE:-disable}"
 
+# Monitored Redis instances. The production instance is always monitored.
+# The stage instance is monitored only when REDIS_STAGE_PORT is set.
+REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
+REDIS_PORT="${REDIS_PORT:-6379}"
+REDIS_PASSWORD="${REDIS_PASSWORD:-}"
+REDIS_STAGE_HOST="${REDIS_STAGE_HOST:-127.0.0.1}"
+REDIS_STAGE_PORT="${REDIS_STAGE_PORT:-}"
+REDIS_STAGE_PASSWORD="${REDIS_STAGE_PASSWORD:-${REDIS_PASSWORD}}"
+
+# PostgreSQL monitoring role used by postgres_exporter. The script creates it
+# in every monitored instance with the password given here.
+POSTGRES_EXPORTER_DB_USER="${POSTGRES_EXPORTER_DB_USER:-postgres_exporter}"
+POSTGRES_EXPORTER_DB_PASSWORD="${POSTGRES_EXPORTER_DB_PASSWORD:-}"
+POSTGRES_STAGE_EXPORTER_DB_PASSWORD="${POSTGRES_STAGE_EXPORTER_DB_PASSWORD:-${POSTGRES_EXPORTER_DB_PASSWORD}}"
+
+# PostgreSQL admin access used to create the monitoring role. If a local Unix
+# user named POSTGRES_ADMIN_SYSTEM_USER exists, the script connects through it
+# and no admin password is needed. Otherwise it connects over TCP with the
+# credentials below. Stage admin credentials default to the production ones.
 POSTGRES_ADMIN_SYSTEM_USER="${POSTGRES_ADMIN_SYSTEM_USER:-postgres}"
-POSTGRES_ADMIN_DB_HOST="${POSTGRES_ADMIN_DB_HOST:-127.0.0.1}"
-POSTGRES_ADMIN_DB_PORT="${POSTGRES_ADMIN_DB_PORT:-5432}"
 POSTGRES_ADMIN_DB_NAME="${POSTGRES_ADMIN_DB_NAME:-postgres}"
 POSTGRES_ADMIN_DB_USER="${POSTGRES_ADMIN_DB_USER:-postgres}"
 POSTGRES_ADMIN_DB_PASSWORD="${POSTGRES_ADMIN_DB_PASSWORD:-}"
+POSTGRES_STAGE_ADMIN_DB_USER="${POSTGRES_STAGE_ADMIN_DB_USER:-${POSTGRES_ADMIN_DB_USER}}"
+POSTGRES_STAGE_ADMIN_DB_PASSWORD="${POSTGRES_STAGE_ADMIN_DB_PASSWORD:-${POSTGRES_ADMIN_DB_PASSWORD}}"
 POSTGRES_SKIP_ROLE_SETUP="${POSTGRES_SKIP_ROLE_SETUP:-false}"
-
-REDIS_EXPORTER_REDIS_ADDR="${REDIS_EXPORTER_REDIS_ADDR:-redis://127.0.0.1:6379}"
-REDIS_EXPORTER_REDIS_PASSWORD="${REDIS_EXPORTER_REDIS_PASSWORD:-}"
-
-STAGE_DB_ENABLED="${STAGE_DB_ENABLED:-false}"
-
-POSTGRES_STAGE_EXPORTER_PORT="${POSTGRES_STAGE_EXPORTER_PORT:-9188}"
-POSTGRES_STAGE_DB_HOST="${POSTGRES_STAGE_DB_HOST:-127.0.0.1}"
-POSTGRES_STAGE_DB_PORT="${POSTGRES_STAGE_DB_PORT:-5433}"
-POSTGRES_STAGE_DB_NAME="${POSTGRES_STAGE_DB_NAME:-postgres}"
-POSTGRES_STAGE_EXPORTER_DB_PASSWORD="${POSTGRES_STAGE_EXPORTER_DB_PASSWORD:-${POSTGRES_EXPORTER_DB_PASSWORD}}"
-
-REDIS_STAGE_EXPORTER_PORT="${REDIS_STAGE_EXPORTER_PORT:-9122}"
-REDIS_STAGE_EXPORTER_REDIS_ADDR="${REDIS_STAGE_EXPORTER_REDIS_ADDR:-redis://127.0.0.1:6380}"
-REDIS_STAGE_EXPORTER_REDIS_PASSWORD="${REDIS_STAGE_EXPORTER_REDIS_PASSWORD:-${REDIS_EXPORTER_REDIS_PASSWORD}}"
 
 MONITORING_IP="${MONITORING_IP:-}"
 
@@ -61,7 +73,10 @@ require_postgres_password() {
 
 run_psql_as_admin() {
   local sql="$1"
-  local db_port="$2"
+  local db_host="$2"
+  local db_port="$3"
+  local admin_user="$4"
+  local admin_password="$5"
 
   if id "${POSTGRES_ADMIN_SYSTEM_USER}" >/dev/null 2>&1; then
     sudo -u "${POSTGRES_ADMIN_SYSTEM_USER}" psql -p "${db_port}" -d "${POSTGRES_ADMIN_DB_NAME}" -v ON_ERROR_STOP=1 <<EOF
@@ -70,11 +85,25 @@ EOF
     return
   fi
 
-  PGPASSWORD="${POSTGRES_ADMIN_DB_PASSWORD}" \
+  if [[ -z "${admin_password}" ]]; then
+    cat >&2 <<EOF
+Cannot create the exporter role in the PostgreSQL instance on ${db_host}:${db_port}:
+there is no local Unix user "${POSTGRES_ADMIN_SYSTEM_USER}" and no admin password was provided.
+
+Either pass admin credentials for that instance:
+  POSTGRES_ADMIN_DB_USER / POSTGRES_ADMIN_DB_PASSWORD                (production instance)
+  POSTGRES_STAGE_ADMIN_DB_USER / POSTGRES_STAGE_ADMIN_DB_PASSWORD    (stage instance)
+or skip role setup entirely and create the role manually in each instance:
+  POSTGRES_SKIP_ROLE_SETUP=true
+EOF
+    exit 1
+  fi
+
+  PGPASSWORD="${admin_password}" \
     psql \
-      -h "${POSTGRES_ADMIN_DB_HOST}" \
+      -h "${db_host}" \
       -p "${db_port}" \
-      -U "${POSTGRES_ADMIN_DB_USER}" \
+      -U "${admin_user}" \
       -d "${POSTGRES_ADMIN_DB_NAME}" \
       -v ON_ERROR_STOP=1 <<EOF
 ${sql}
@@ -140,13 +169,18 @@ install_redis_exporter() {
 }
 
 create_postgres_monitoring_user() {
-  local db_port="$1"
-  local exporter_password="$2"
+  local db_host="$1"
+  local db_port="$2"
+  local exporter_password="$3"
+  local admin_user="$4"
+  local admin_password="$5"
 
   if [[ "${POSTGRES_SKIP_ROLE_SETUP}" == "true" ]]; then
     echo "Skipping PostgreSQL role setup because POSTGRES_SKIP_ROLE_SETUP=true."
     return
   fi
+
+  echo "Creating/updating role ${POSTGRES_EXPORTER_DB_USER} in the PostgreSQL instance on ${db_host}:${db_port}..."
 
   local escaped_password
   escaped_password="${exporter_password//\'/\'\'}"
@@ -166,7 +200,7 @@ GRANT pg_monitor TO ${POSTGRES_EXPORTER_DB_USER};
 EOF
 )"
 
-  run_psql_as_admin "${role_sql}" "${db_port}"
+  run_psql_as_admin "${role_sql}" "${db_host}" "${db_port}" "${admin_user}" "${admin_password}"
 }
 
 write_node_exporter_service() {
@@ -249,8 +283,11 @@ enable_services() {
   systemctl enable --now postgres_exporter.service
   systemctl enable --now redis_exporter.service
 
-  if [[ "${STAGE_DB_ENABLED}" == "true" ]]; then
+  if [[ -n "${POSTGRES_STAGE_DB_PORT}" ]]; then
     systemctl enable --now postgres_exporter_stage.service
+  fi
+
+  if [[ -n "${REDIS_STAGE_PORT}" ]]; then
     systemctl enable --now redis_exporter_stage.service
   fi
 }
@@ -270,8 +307,11 @@ configure_ufw() {
   ufw allow from "${MONITORING_IP}" to any port "${POSTGRES_EXPORTER_PORT}" proto tcp
   ufw allow from "${MONITORING_IP}" to any port "${REDIS_EXPORTER_PORT}" proto tcp
 
-  if [[ "${STAGE_DB_ENABLED}" == "true" ]]; then
+  if [[ -n "${POSTGRES_STAGE_DB_PORT}" ]]; then
     ufw allow from "${MONITORING_IP}" to any port "${POSTGRES_STAGE_EXPORTER_PORT}" proto tcp
+  fi
+
+  if [[ -n "${REDIS_STAGE_PORT}" ]]; then
     ufw allow from "${MONITORING_IP}" to any port "${REDIS_STAGE_EXPORTER_PORT}" proto tcp
   fi
 }
@@ -281,15 +321,21 @@ print_summary() {
   local stage_verify_local=""
   local stage_verify_remote=""
 
-  if [[ "${STAGE_DB_ENABLED}" == "true" ]]; then
-    stage_installed="
-- postgres_exporter_stage on port ${POSTGRES_STAGE_EXPORTER_PORT} (PostgreSQL at ${POSTGRES_STAGE_DB_HOST}:${POSTGRES_STAGE_DB_PORT})
-- redis_exporter_stage on port ${REDIS_STAGE_EXPORTER_PORT} (Redis at ${REDIS_STAGE_EXPORTER_REDIS_ADDR})"
-    stage_verify_local="
-- curl http://127.0.0.1:${POSTGRES_STAGE_EXPORTER_PORT}/metrics
+  if [[ -n "${POSTGRES_STAGE_DB_PORT}" ]]; then
+    stage_installed="${stage_installed}
+- postgres_exporter_stage on port ${POSTGRES_STAGE_EXPORTER_PORT} (PostgreSQL at ${POSTGRES_STAGE_DB_HOST}:${POSTGRES_STAGE_DB_PORT})"
+    stage_verify_local="${stage_verify_local}
+- curl http://127.0.0.1:${POSTGRES_STAGE_EXPORTER_PORT}/metrics"
+    stage_verify_remote="${stage_verify_remote}
+- curl http://<db-host>:${POSTGRES_STAGE_EXPORTER_PORT}/metrics"
+  fi
+
+  if [[ -n "${REDIS_STAGE_PORT}" ]]; then
+    stage_installed="${stage_installed}
+- redis_exporter_stage on port ${REDIS_STAGE_EXPORTER_PORT} (Redis at ${REDIS_STAGE_HOST}:${REDIS_STAGE_PORT})"
+    stage_verify_local="${stage_verify_local}
 - curl http://127.0.0.1:${REDIS_STAGE_EXPORTER_PORT}/metrics"
-    stage_verify_remote="
-- curl http://<db-host>:${POSTGRES_STAGE_EXPORTER_PORT}/metrics
+    stage_verify_remote="${stage_verify_remote}
 - curl http://<db-host>:${REDIS_STAGE_EXPORTER_PORT}/metrics"
   fi
 
@@ -299,8 +345,8 @@ DB VPS bootstrap complete.
 
 Installed:
 - node_exporter on port ${NODE_EXPORTER_PORT}
-- postgres_exporter on port ${POSTGRES_EXPORTER_PORT}
-- redis_exporter on port ${REDIS_EXPORTER_PORT}${stage_installed}
+- postgres_exporter on port ${POSTGRES_EXPORTER_PORT} (PostgreSQL at ${POSTGRES_DB_HOST}:${POSTGRES_DB_PORT})
+- redis_exporter on port ${REDIS_EXPORTER_PORT} (Redis at ${REDIS_HOST}:${REDIS_PORT})${stage_installed}
 
 Verify locally:
 - curl http://127.0.0.1:${NODE_EXPORTER_PORT}/metrics
@@ -313,15 +359,12 @@ Verify from monitoring VPS:
 - curl http://<db-host>:${REDIS_EXPORTER_PORT}/metrics${stage_verify_remote}
 
 Notes:
+- Stage exporters are installed only when POSTGRES_STAGE_DB_PORT / REDIS_STAGE_PORT are set.
 - If the server has no local Unix user named "${POSTGRES_ADMIN_SYSTEM_USER}", provide PostgreSQL admin credentials:
-  POSTGRES_ADMIN_DB_USER=<admin-user>
-  POSTGRES_ADMIN_DB_PASSWORD=<admin-password>
+  POSTGRES_ADMIN_DB_USER=<admin-user> POSTGRES_ADMIN_DB_PASSWORD=<admin-password>
+  POSTGRES_STAGE_ADMIN_DB_USER / POSTGRES_STAGE_ADMIN_DB_PASSWORD for the stage instance (default to the production ones)
 - If the exporter role already exists and you do not want the script to manage it, set:
   POSTGRES_SKIP_ROLE_SETUP=true
-- If a stage PostgreSQL/Redis instance also runs on this VPS, set:
-  STAGE_DB_ENABLED=true
-  and optionally override POSTGRES_STAGE_DB_PORT, REDIS_STAGE_EXPORTER_REDIS_ADDR,
-  POSTGRES_STAGE_EXPORTER_PORT, REDIS_STAGE_EXPORTER_PORT.
 EOF
 }
 
@@ -334,25 +377,36 @@ ensure_system_user "${REDIS_EXPORTER_USER}"
 install_node_exporter
 install_postgres_exporter
 install_redis_exporter
-create_postgres_monitoring_user "${POSTGRES_ADMIN_DB_PORT}" "${POSTGRES_EXPORTER_DB_PASSWORD}"
+
+create_postgres_monitoring_user \
+  "${POSTGRES_DB_HOST}" \
+  "${POSTGRES_DB_PORT}" \
+  "${POSTGRES_EXPORTER_DB_PASSWORD}" \
+  "${POSTGRES_ADMIN_DB_USER}" \
+  "${POSTGRES_ADMIN_DB_PASSWORD}"
 write_node_exporter_service
 write_postgres_exporter_service \
   "postgres_exporter" \
   "PostgreSQL Exporter" \
-  "${POSTGRES_EXPORTER_DB_HOST}" \
-  "${POSTGRES_EXPORTER_DB_PORT}" \
-  "${POSTGRES_EXPORTER_DB_NAME}" \
+  "${POSTGRES_DB_HOST}" \
+  "${POSTGRES_DB_PORT}" \
+  "${POSTGRES_DB_NAME}" \
   "${POSTGRES_EXPORTER_DB_PASSWORD}" \
   "${POSTGRES_EXPORTER_PORT}"
 write_redis_exporter_service \
   "redis_exporter" \
   "Redis Exporter" \
   "${REDIS_EXPORTER_PORT}" \
-  "${REDIS_EXPORTER_REDIS_ADDR}" \
-  "${REDIS_EXPORTER_REDIS_PASSWORD}"
+  "redis://${REDIS_HOST}:${REDIS_PORT}" \
+  "${REDIS_PASSWORD}"
 
-if [[ "${STAGE_DB_ENABLED}" == "true" ]]; then
-  create_postgres_monitoring_user "${POSTGRES_STAGE_DB_PORT}" "${POSTGRES_STAGE_EXPORTER_DB_PASSWORD}"
+if [[ -n "${POSTGRES_STAGE_DB_PORT}" ]]; then
+  create_postgres_monitoring_user \
+    "${POSTGRES_STAGE_DB_HOST}" \
+    "${POSTGRES_STAGE_DB_PORT}" \
+    "${POSTGRES_STAGE_EXPORTER_DB_PASSWORD}" \
+    "${POSTGRES_STAGE_ADMIN_DB_USER}" \
+    "${POSTGRES_STAGE_ADMIN_DB_PASSWORD}"
   write_postgres_exporter_service \
     "postgres_exporter_stage" \
     "PostgreSQL Exporter (stage)" \
@@ -361,12 +415,15 @@ if [[ "${STAGE_DB_ENABLED}" == "true" ]]; then
     "${POSTGRES_STAGE_DB_NAME}" \
     "${POSTGRES_STAGE_EXPORTER_DB_PASSWORD}" \
     "${POSTGRES_STAGE_EXPORTER_PORT}"
+fi
+
+if [[ -n "${REDIS_STAGE_PORT}" ]]; then
   write_redis_exporter_service \
     "redis_exporter_stage" \
     "Redis Exporter (stage)" \
     "${REDIS_STAGE_EXPORTER_PORT}" \
-    "${REDIS_STAGE_EXPORTER_REDIS_ADDR}" \
-    "${REDIS_STAGE_EXPORTER_REDIS_PASSWORD}"
+    "redis://${REDIS_STAGE_HOST}:${REDIS_STAGE_PORT}" \
+    "${REDIS_STAGE_PASSWORD}"
 fi
 
 enable_services
