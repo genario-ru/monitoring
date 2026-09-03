@@ -158,6 +158,13 @@ start containers or mutate remote hosts as part of default validation.
 5. Do not run scripts by default. Review them statically and report that runtime
    VPS validation was not performed unless the user explicitly asked.
 
+## Pull Requests
+
+- Agents may create a feature branch and open a pull request for owner review.
+- Use branch names like `agent/TASK-XXX-short-slug` when working from orchestrator tasks.
+- Never force-push to `main`.
+- Owner merges after review; do not merge your own PR unless explicitly asked.
+
 ## Completion Checklist
 
 Before finishing, report:
