@@ -1,398 +1,201 @@
-# Monitoring
+# Genario — Monitoring
 
-This repository contains the self-hosted monitoring stack for `genario`:
+**The self-hosted observability stack that watches Genario in production.** It collects
+metrics from four servers and every application instance, stores and evaluates them,
+renders dashboards, delivers alerts when something breaks, and captures application errors
+— all running on infrastructure owned by the project, with no third-party SaaS involved.
 
-- `Dokploy Domains` publishes Grafana on `https://grafana.<your-domain>` and GlitchTip on `https://glitchtip.<your-domain>`
-- `Grafana` renders dashboards
-- `VictoriaMetrics` stores, scrapes, and serves metrics
-- `vmalert` evaluates alert rules against `VictoriaMetrics`
-- `Alertmanager` routes baseline alerts to `email`
-- `GlitchTip` provides self-hosted error tracking with its own PostgreSQL and Valkey dependencies
+Everything here is configuration as code: dashboards, alert rules, scrape targets and host
+provisioning all live in git and deploy the same way the applications do.
 
-## Repository layout
+> **Companion repositories:** [backend](https://github.com/genario-ru/backend) ·
+> [web client](https://github.com/genario-ru/frontend)
 
-- `docker-compose.yml`: monitoring stack definition
-- `.env.example`: required runtime variables
-- `AGENTS.md`: canonical instructions for AI agents working in this repository
-- `.agents/`, `.cursor/`, `.claude/`: tool-specific AI workflows derived from `AGENTS.md`
-- `scripts/`: bootstrap scripts for `backend VPS`, `frontend VPS`, `monitoring VPS`, and `db VPS`
-- `victoriametrics/`: scrape configuration for `VictoriaMetrics`
-- `vmalert/`: alert rules for `vmalert`
-- `alertmanager/`: Alertmanager config
-- `grafana/provisioning/`: automatic datasource and dashboard provisioning
-- `grafana/dashboards/`: file-based dashboards committed to git
+---
 
-## What this repository currently covers
+## What it is built from
 
-- `backend` scrape targets on `https://<backend-domain>/metrics` and `https://<stage-backend-domain>/metrics`
-- `backend-node` scrape target on `http://<backend-vps-ip>:9100/metrics`
-- `frontend-node` scrape target on `http://<frontend-vps-ip>:9100/metrics`
-- `monitoring-node` scrape target on `http://<monitoring-vps-ip>:9100/metrics`
-- `db-node` scrape target on `http://<db-vps-ip>:9100/metrics`
-- `postgres` scrape targets for the `production` and `stage` PostgreSQL instances on `http://<db-vps-ip>:<postgres-exporter-port>/metrics` and `http://<db-vps-ip>:<postgres-stage-exporter-port>/metrics`
-- `redis` scrape targets for the `production` and `stage` Redis instances on `http://<db-vps-ip>:<redis-exporter-port>/metrics` and `http://<db-vps-ip>:<redis-stage-exporter-port>/metrics`
-- one backend host dashboard
-- one backend API dashboard
-- one frontend host dashboard
-- one monitoring host dashboard
-- one PostgreSQL dashboard
-- one Redis dashboard
-- baseline alert rules for backend, hosts, PostgreSQL, and Redis
-- one self-hosted `GlitchTip` deployment for application error tracking
+| Component | Role |
+| --- | --- |
+| **VictoriaMetrics** | Scrapes every target and stores the time series; the single metrics backend |
+| **vmalert** | Evaluates alert rules against VictoriaMetrics and fires alerts |
+| **Alertmanager** | Groups, deduplicates and routes fired alerts to email |
+| **Grafana** | Renders dashboards, provisioned from files rather than clicked together in the UI |
+| **GlitchTip** | Self-hosted error tracking for the API, workers and web client, with its own PostgreSQL and Valkey |
+| **Exporters** | `node_exporter`, `postgres_exporter` and `redis_exporter` on the monitored hosts |
+| **Bootstrap scripts** | Idempotent shell scripts that install exporters, create system users, write systemd units and scope firewall rules |
 
-This repository still does **not** include:
+The whole stack is a Docker Compose deployment managed by Dokploy, deployed from `main`
+through GitHub Actions.
 
-- worker metrics
-- logs / traces
-- HA `VictoriaMetrics` / `vmalert` / `Alertmanager`
-- application-side GlitchTip SDK wiring for each service
+---
 
-## Local configuration
+## Architecture
 
-1. Copy `.env.example` to `.env`.
-2. Set:
-   - `GRAFANA_ADMIN_USER`
-   - `GRAFANA_ADMIN_PASSWORD`
-   - `BACKEND_PRODUCTION_DOMAIN`
-   - `BACKEND_STAGE_DOMAIN`
-   - `FRONTEND_PRODUCTION_DOMAIN`
-   - `MONITORING_IP`
-   - `DB_IP`
-   - `POSTGRES_EXPORTER_PORT`
-   - `REDIS_EXPORTER_PORT`
-   - `POSTGRES_STAGE_EXPORTER_PORT`
-   - `REDIS_STAGE_EXPORTER_PORT`
-   - `ALERTMANAGER_EMAIL_FROM`
-   - `ALERTMANAGER_EMAIL_TO`
-   - `ALERTMANAGER_EMAIL_SMARTHOST`
-   - `ALERTMANAGER_EMAIL_AUTH_USERNAME`
-   - `ALERTMANAGER_EMAIL_AUTH_PASSWORD`
-   - `ALERTMANAGER_EMAIL_REQUIRE_TLS`
-   - `GLITCHTIP_DOMAIN`
-   - `GLITCHTIP_SECRET_KEY`
-   - `GLITCHTIP_DEFAULT_FROM_EMAIL`
-   - `GLITCHTIP_EMAIL_URL`
-   - `GLITCHTIP_POSTGRES_PASSWORD`
-   - `GLITCHTIP_VALKEY_PASSWORD`
-3. Keep `VICTORIAMETRICS_RETENTION_MONTHS=1` unless you have a clear reason to retain more metrics.
-4. Keep `GLITCHTIP_ENABLE_ADMIN=false`, `GLITCHTIP_ENABLE_OPENAPI=false`, and `GLITCHTIP_ENABLE_MCP=false` unless you explicitly need them.
-5. `GLITCHTIP_EMAIL_URL=consolemail://` is acceptable for first boot and testing. For production, replace it with a real SMTP URL so invites, password resets, and notifications leave the container.
-6. Keep all Alertmanager and GlitchTip secrets only in the real `.env` on the monitoring VPS; never commit them to git.
+```mermaid
+flowchart LR
+  subgraph Monitored["Monitored infrastructure"]
+    BE["Backend VPS<br/>API /metrics + node_exporter"]
+    FE["Frontend VPS<br/>node_exporter"]
+    DB["DB VPS<br/>postgres_exporter + redis_exporter + node_exporter"]
+    MON["Monitoring VPS<br/>node_exporter"]
+  end
 
-## AI agent safety policy
+  subgraph Stack["Monitoring stack"]
+    VM["VictoriaMetrics"]
+    VA["vmalert"]
+    AM["Alertmanager"]
+    GR["Grafana"]
+    GT["GlitchTip"]
+  end
 
-- Agents may run read-only validation such as `docker compose --env-file .env.example config`.
-- Agents must not run `docker compose up`, `docker compose down`, `docker compose pull`, `docker compose restart`, `docker compose exec`, destructive Docker volume commands, or `scripts/bootstrap-*.sh` unless the user explicitly asks for that exact operation in the current task.
-- Agents must not commit real `.env` values, SMTP credentials, GlitchTip secrets, IP allowlists, or production tokens.
-- Infrastructure changes should report which dashboards, alert rules, scrape jobs, env variables, and firewall assumptions were checked.
-
-## Deploy on monitoring VPS
-
-```powershell
-Copy-Item .env.example .env
-docker compose pull
-docker compose up -d
+  BE -->|scrape| VM
+  FE -->|scrape| VM
+  DB -->|scrape| VM
+  MON -->|scrape| VM
+  VM --> VA
+  VA -->|fired alerts| AM
+  AM -->|email| Ops["On-call inbox"]
+  VM --> GR
+  Apps["API · workers · web client"] -->|errors| GT
+  GR -->|Dokploy domain, HTTPS| Web["Browser"]
+  GT -->|Dokploy domain, HTTPS| Web
 ```
 
-After startup:
-
-- configure a Dokploy domain for the `grafana` service on port `3000`
-- configure a Dokploy domain for the `glitchtip` service on port `8000`
-- open the configured Grafana domain
-- log in with `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`
-- confirm the `VictoriaMetrics` datasource is healthy
-- confirm the `Backend`, `Frontend`, and `DB` dashboard folders are present
-- open the configured GlitchTip domain
-- create the first GlitchTip user and organization
-- if `GLITCHTIP_EMAIL_URL=consolemail://`, use `docker compose logs -f glitchtip` to inspect outbound email output until SMTP is configured
-
-## GlitchTip notes
-
-- The compose stack follows the current GlitchTip Docker installation guidance as of May 25, 2026: one `all_in_one` GlitchTip container plus dedicated PostgreSQL and Valkey containers.
-- Database migrations run automatically on `glitchtip` startup; there is no separate `migrate` service in this repository.
-- Uploaded artifacts such as sourcemaps are stored in the `glitchtip_uploads` Docker volume.
-- The PostgreSQL and Valkey containers are internal-only and stay on the `monitoring` Docker network.
-
-## Bootstrap scripts
-
-You can bootstrap new servers with repo scripts instead of repeating the
-manual install steps.
-
-Copy the script from your local clone of this repository to the target VPS
-with `scp`, then run it over SSH.
-
-Backend VPS:
-
-```bash
-scp scripts/bootstrap-backend-vps.sh <user>@<backend-vps-ip>:~/
-ssh <user>@<backend-vps-ip>
-sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-backend-vps.sh
-```
-
-Frontend VPS:
-
-```bash
-scp scripts/bootstrap-frontend-vps.sh <user>@<frontend-vps-ip>:~/
-ssh <user>@<frontend-vps-ip>
-sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-frontend-vps.sh
-```
-
-Monitoring VPS:
-
-```bash
-scp scripts/bootstrap-monitoring-vps.sh <user>@<monitoring-vps-ip>:~/
-ssh <user>@<monitoring-vps-ip>
-sudo bash bootstrap-monitoring-vps.sh
-```
-
-DB VPS:
-
-```bash
-scp scripts/bootstrap-db-vps.sh <user>@<db-vps-ip>:~/
-ssh <user>@<db-vps-ip>
-sudo env \
-  MONITORING_IP=<monitoring-ip> \
-  POSTGRES_DB_PORT=5432 \
-  POSTGRES_STAGE_DB_PORT=5433 \
-  REDIS_PORT=6379 \
-  REDIS_STAGE_PORT=6380 \
-  POSTGRES_EXPORTER_DB_PASSWORD=<new-password-for-the-exporter-role> \
-  POSTGRES_ADMIN_DB_USER=<production-postgres-admin-user> \
-  POSTGRES_ADMIN_DB_PASSWORD=<production-postgres-admin-password> \
-  POSTGRES_STAGE_ADMIN_DB_USER=<stage-postgres-admin-user> \
-  POSTGRES_STAGE_ADMIN_DB_PASSWORD=<stage-postgres-admin-password> \
-  bash bootstrap-db-vps.sh
-```
-
-The script installs an exporter for every database whose port you pass:
-
-- `POSTGRES_DB_PORT` (default `5432`) -> `postgres_exporter` listening on `9187`
-- `POSTGRES_STAGE_DB_PORT` (no default; set it only if a stage PostgreSQL
-  instance runs on this VPS) -> `postgres_exporter_stage` listening on `9188`
-- `REDIS_PORT` (default `6379`) -> `redis_exporter` listening on `9121`
-- `REDIS_STAGE_PORT` (no default; set it only if a stage Redis instance runs
-  on this VPS) -> `redis_exporter_stage` listening on `9122`
-
-Passwords and credentials:
-
-- `POSTGRES_EXPORTER_DB_PASSWORD` is a **new** password you invent for the
-  `postgres_exporter` monitoring role. The script creates that role in every
-  monitored PostgreSQL instance.
-- `POSTGRES_ADMIN_DB_USER` / `POSTGRES_ADMIN_DB_PASSWORD` are the superuser
-  credentials of the production PostgreSQL instance; they are needed to create
-  the monitoring role. `POSTGRES_STAGE_ADMIN_DB_USER` /
-  `POSTGRES_STAGE_ADMIN_DB_PASSWORD` are the same for the stage instance and
-  default to the production values. If a local Unix user `postgres` exists on
-  the VPS, admin credentials are not needed at all.
-- `REDIS_PASSWORD` / `REDIS_STAGE_PASSWORD` are only needed when the Redis
-  instances require auth.
-- To manage the PostgreSQL monitoring role yourself instead of letting the
-  script create it, pass `POSTGRES_SKIP_ROLE_SETUP=true` and run this in every
-  instance manually:
-
-```sql
-CREATE USER postgres_exporter WITH PASSWORD '<same-as-POSTGRES_EXPORTER_DB_PASSWORD>';
-GRANT pg_monitor TO postgres_exporter;
-```
-
-The scripts install exporters, create system users, write `systemd` units,
-start services, and optionally add `ufw` rules if `MONITORING_IP` is set.
+Note the direction of every arrow into the stack: monitoring **pulls** from the
+infrastructure. Nothing on a monitored host needs credentials for the monitoring VPS, and
+losing the monitoring server cannot take production down with it.
+
+---
+
+## What is monitored
 
-## Manual work on backend VPS
-
-1. Install `node_exporter` as a `systemd` service.
-2. Open port `9100` **only** for the monitoring VPS IP.
-3. Set backend env:
-
-```env
-METRICS_ALLOWED_IPS=<monitoring-vps-ip>
-```
+| Scrape job | Target | Interval |
+| --- | --- | --- |
+| `backend` | The API's `/metrics` over HTTPS, for **production and stage** separately | 15s |
+| `backend-node` | Host metrics of the backend VPS | 30s |
+| `frontend-node` | Host metrics of the frontend VPS | 30s |
+| `db-node` | Host metrics of the database VPS | 30s |
+| `monitoring-node` | Host metrics of the monitoring VPS itself | 30s |
+| `postgres` | PostgreSQL exporter, **production and stage** instances | 30s |
+| `redis` | Redis exporter, **production and stage** instances | 30s |
 
-4. Redeploy `genario-backend` after the `/metrics` code changes.
-5. Verify that:
-   - `curl https://<backend-domain>/metrics` works from the monitoring VPS when `METRICS_ALLOWED_IPS` contains the monitoring VPS public IP
-   - `curl https://<stage-backend-domain>/metrics` works from the monitoring VPS when `METRICS_ALLOWED_IPS` contains the monitoring VPS public IP
-   - VictoriaMetrics shows `backend` and `backend-node` as `UP`
+Production and stage are separate targets on the same job, distinguished by labels rather
+than by duplicated configuration — which is why one dashboard can switch between
+environments instead of existing twice.
 
-Example `node_exporter` service:
+Application-level metrics come from the backend itself: request rate, response classes,
+latency histograms and in-flight requests, all labelled by route and status class.
 
-```ini
-[Unit]
-Description=Node Exporter
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=node_exporter
-Group=node_exporter
-ExecStart=/usr/local/bin/node_exporter
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## Manual work on db VPS
-
-1. Install `node_exporter` as a `systemd` service.
-2. Open port `9100` **only** for the monitoring VPS IP.
-3. Create a dedicated PostgreSQL monitoring user:
-
-```sql
-CREATE USER postgres_exporter WITH PASSWORD 'change-me';
-GRANT pg_monitor TO postgres_exporter;
-```
-
-4. Install `postgres_exporter` as a `systemd` service.
-5. Install `redis_exporter` as a `systemd` service.
-6. If a stage PostgreSQL (`5433`) and Redis (`6380`) instance run on the same VPS, repeat steps 3-5 for them: create the monitoring role in the stage PostgreSQL instance and install `postgres_exporter_stage` / `redis_exporter_stage` units on ports `9188` and `9122`.
-7. Open ports `9187` and `9121` (plus `9188` and `9122` for stage) **only** for the monitoring VPS IP.
-8. Verify that VictoriaMetrics shows `db-node`, both `postgres` targets, and both `redis` targets as `UP`.
-
-Example `postgres_exporter` DSN:
-
-```env
-DATA_SOURCE_NAME=postgresql://postgres_exporter:change-me@127.0.0.1:5432/postgres?sslmode=disable
-```
-
-Example `postgres_exporter` service:
-
-```ini
-[Unit]
-Description=PostgreSQL Exporter
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=postgres_exporter
-Group=postgres_exporter
-Environment="DATA_SOURCE_NAME=postgresql://postgres_exporter:change-me@127.0.0.1:5432/postgres?sslmode=disable"
-ExecStart=/usr/local/bin/postgres_exporter --web.listen-address=:9187
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Example `redis_exporter` command:
-
-```powershell
-/usr/local/bin/redis_exporter --web.listen-address=:9121 --redis.addr=redis://127.0.0.1:6379
-```
-
-If Redis requires auth, add:
-
-```powershell
---redis.password=<redis-password>
-```
-
-Example `redis_exporter` service:
-
-```ini
-[Unit]
-Description=Redis Exporter
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=redis_exporter
-Group=redis_exporter
-ExecStart=/usr/local/bin/redis_exporter --web.listen-address=:9121 --redis.addr=redis://127.0.0.1:6379
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## Manual work on frontend VPS
-
-1. Install `node_exporter` as a `systemd` service.
-2. Open port `9100` **only** for the monitoring VPS IP.
-3. Verify that VictoriaMetrics shows `frontend-node` as `UP`.
-
-The bootstrap script already covers this setup for a fresh VPS:
-
-```bash
-sudo env MONITORING_IP=<monitoring-ip> bash bootstrap-frontend-vps.sh
-```
-
-## Manual work on monitoring VPS
-
-1. Install `node_exporter` as a `systemd` service.
-2. Set `MONITORING_IP` in `genario-monitoring` runtime env.
-3. Redeploy `genario-monitoring`.
-4. Verify that VictoriaMetrics shows `monitoring-node` as `UP`.
-5. If you later enable a host firewall on the monitoring VPS, make sure Docker containers running the monitoring stack can still reach port `9100` on the host.
-
-The bootstrap script already covers the `node_exporter` setup:
-
-```bash
-sudo bash bootstrap-monitoring-vps.sh
-```
-
-## Firewall checklist
-
-- allow `monitoring VPS -> backend HTTPS domain : 443`
-- allow `monitoring VPS -> backend VPS : 9100`
-- allow `monitoring VPS -> frontend VPS : 9100`
-- allow `monitoring VPS -> db VPS : 9100`
-- allow `monitoring VPS -> db VPS : 9187`
-- allow `monitoring VPS -> db VPS : 9121`
-- allow `monitoring VPS -> db VPS : 9188` (stage PostgreSQL exporter)
-- allow `monitoring VPS -> db VPS : 9122` (stage Redis exporter)
-- do **not** publish VictoriaMetrics, `vmalert`, or Alertmanager to the public internet
-- do **not** publish custom `80/443` ports from this compose stack; Dokploy already owns ingress on the server
-
-## Alerts
-
-- All baseline alerts go to `email`.
-- Routing is intentionally simple in this phase: no severity splitting yet.
-- Baseline thresholds in alert rules are starting defaults only.
-- Revisit thresholds after several days of production observation.
-- Required env for alerting:
-  - `ALERTMANAGER_EMAIL_FROM`
-  - `ALERTMANAGER_EMAIL_TO`
-  - `ALERTMANAGER_EMAIL_SMARTHOST`
-  - `ALERTMANAGER_EMAIL_AUTH_USERNAME`
-  - `ALERTMANAGER_EMAIL_AUTH_PASSWORD`
-  - `ALERTMANAGER_EMAIL_REQUIRE_TLS`
-- `Alertmanager` renders `/etc/alertmanager/alertmanager.yml.tpl` to `/tmp/alertmanager.yml` at container startup, then starts the real binary with that rendered config.
-- `vmalert` is the rule engine. `Alertmanager` only receives already-fired alerts and handles grouping and delivery.
-
-## Alerting checks
-
-After deploy:
-
-- `docker compose ps` should show `alertmanager` as `Up` with no restart loop.
-- Alertmanager logs must not contain `unexpected /bin/sh`.
-- `vmalert` must keep `-notifier.url=http://alertmanager:9093` healthy.
-
-End-to-end smoke test:
-
-1. Temporarily stop `redis_exporter` on the db VPS.
-2. Wait for the `RedisDown` alert to fire.
-3. Confirm the alert appears in `vmalert`.
-4. Confirm the alert appears in `Alertmanager`.
-5. Confirm the notification arrives in `email`.
-6. Start `redis_exporter` again and verify resolved notification delivery.
-
-Repeat the same flow with `postgres_exporter` and `PostgresDown`.
-
-## Acceptance checklist
-
-- `https://grafana.<domain>` is reachable over `HTTPS`
-- `https://glitchtip.<domain>` is reachable over `HTTPS`
-- Grafana requires login
-- GlitchTip shows the setup/login screen and can create the first organization
-- `backend` has both `production` and `stage` targets `UP` in VictoriaMetrics
-- `backend-node`, `frontend-node`, `monitoring-node`, and `db-node` are `UP` in VictoriaMetrics
-- `postgres` and `redis` have both `production` and `stage` targets `UP` in VictoriaMetrics
-- `Backend / Host Overview` shows CPU, memory, disk, load, network, uptime for the backend VPS
-- `Frontend / Host Overview` shows CPU, memory, disk, load, network, uptime for the frontend VPS
-- `Monitoring / Host Overview` shows CPU, memory, disk, load, network, uptime for the monitoring VPS
-- `Backend Overview` shows request rate, response classes, latency, in-flight requests, memory, CPU, uptime for the selected backend environment
-- `Backend / API Endpoints` lets you switch between `production` and `stage` on the same dashboard
-- `Postgres Overview` shows exporter health, DB health, connections, transaction rate, size, deadlocks, checkpoint pressure, and lets you switch between `production` and `stage` instances
-- `Redis Overview` shows exporter health, Redis health, memory usage, clients, ops/sec, evictions, rejected connections, persistence health, and lets you switch between `production` and `stage` instances
-- `/metrics` on the backend is only accessible from the allowlisted monitoring IP
-- stopping `postgres_exporter` or `redis_exporter` produces a test alert delivered to `email`
+---
+
+## Dashboards
+
+Eight dashboards are committed as JSON and provisioned into Grafana automatically, grouped
+into `Backend`, `Frontend`, `DB` and `Monitoring` folders:
+
+- **Backend Overview** — request rate, response classes, latency, in-flight requests,
+  process memory and CPU, uptime; switchable between production and stage.
+- **Backend / API Endpoints** — per-endpoint breakdown, same environment switch.
+- **Host Overview** (one per VPS) — CPU, memory, disk, load, network and uptime.
+- **Postgres Overview** — exporter and database health, connections, transaction rate,
+  database size, deadlocks, checkpoint pressure.
+- **Redis Overview** — exporter and Redis health, memory usage, clients, ops/sec,
+  evictions, rejected connections, persistence health.
+
+Because dashboards live in git with stable UIDs, a dashboard change is reviewed in a pull
+request and cannot be lost when a container is recreated.
+
+---
+
+## Alerting
+
+Fourteen baseline rules are evaluated by vmalert and routed to email by Alertmanager.
+Every rule carries a `for:` duration, so a transient blip does not page anyone.
+
+| Category | Rules |
+| --- | --- |
+| **Availability** | `BackendDown`, `BackendNodeDown`, `FrontendNodeDown`, `DbNodeDown`, `MonitoringNodeDown`, `PostgresDown`, `RedisDown` |
+| **Application health** | `BackendHigh5xxRate` (5xx rate above threshold for 10 min), `BackendHighLatencyP95` (p95 above one second for 10 min) |
+| **Host capacity** | `HostHighCpu`, `HostLowMemory`, `HostDiskAlmostFull` |
+| **Datastore pressure** | `PostgresTooManyConnections`, `RedisHighMemoryUsage` |
+
+The split of responsibilities is deliberate: **vmalert** decides *whether* something is
+wrong, **Alertmanager** decides *who hears about it and how often*. Thresholds are
+documented as starting defaults to be revised against real production behaviour rather
+than treated as settled truth.
+
+---
+
+## Error tracking
+
+GlitchTip runs alongside the metrics stack as a self-hosted, Sentry-compatible error
+tracker, backed by its own PostgreSQL and Valkey containers. The API, the workers and the
+web client all report to it with release tagging, so a production stack trace can be traced
+back to the commit that introduced it. Metrics answer *is something wrong*; GlitchTip
+answers *what exactly broke, for whom, and since which release*.
+
+---
+
+## Host provisioning
+
+Four bootstrap scripts turn a bare VPS into a monitored one: they install the right
+exporters, create dedicated unprivileged system users, write systemd units, start the
+services, and — when given the monitoring host's address — add firewall rules that expose
+exporter ports to that address only.
+
+They are written to be re-runnable: users are created only when missing, units are
+rewritten deliberately, and each script ends by printing the next verification step. Adding
+a server is a repeatable operation rather than a remembered sequence of SSH commands.
+
+---
+
+## Security and network posture
+
+- **Only two services are reachable from the internet** — Grafana and GlitchTip, published
+  over HTTPS through Dokploy domains. VictoriaMetrics, vmalert, Alertmanager and
+  GlitchTip's PostgreSQL and Valkey stay on an internal Docker network with no published
+  ports.
+- **Exporters are firewalled to the monitoring host.** Ports 9100, 9187, 9121 and their
+  stage counterparts accept traffic from the monitoring VPS address only.
+- **The backend's `/metrics` endpoint is IP-allowlisted** in the application itself, so
+  even though it lives on the public API domain, only the monitoring host can read it.
+- **No credentials in git.** Alertmanager's configuration is committed as a template with
+  placeholders and rendered from environment variables at container start; only
+  `.env.example` with placeholder values is tracked.
+- **The monitoring stack has no write access to production.** It scrapes read-only
+  endpoints and connects to databases through a dedicated `pg_monitor` role that can read
+  statistics and nothing else.
+
+---
+
+## Current scope
+
+The stack covers infrastructure health, API performance and application errors. Worker
+queue metrics, log aggregation, distributed tracing and a high-availability configuration
+of VictoriaMetrics are deliberately out of scope at this stage — a single-node deployment
+with one-month retention matches the traffic this product actually serves, and the
+boundary is documented rather than discovered during an incident.
+
+---
+
+## Repository map
+
+| Path | Contents |
+| --- | --- |
+| `docker-compose.yml` | The full stack: Grafana, VictoriaMetrics, vmalert, Alertmanager, GlitchTip and its dependencies |
+| `victoriametrics/scrape.yml` | Scrape jobs and target templates |
+| `vmalert/rules/alerts.yml` | Alert rules |
+| `alertmanager/alertmanager.yml.tpl` | Routing and delivery template, rendered at startup |
+| `grafana/dashboards/` | Committed dashboard JSON, grouped by folder |
+| `grafana/provisioning/` | Datasource and dashboard provisioning |
+| `scripts/` | Bootstrap scripts for the backend, frontend, database and monitoring hosts |
+| `.github/workflows/` | Deployment pipeline |
+| `AGENTS.md`, `CLAUDE.md`, `.cursor/`, `.agents/` | Working agreements and repeatable workflows for AI coding tools |
+
+---
+
+## License
+
+Source-available for review only. See [LICENSE](LICENSE) — no permission is granted to
+use, copy, modify or distribute this configuration.
